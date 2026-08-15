@@ -784,3 +784,38 @@ test("isForbiddenMove：自由規則下黑棋長連／四四／三三皆非禁�
   t[5][7] = G.BLACK; t[6][7] = G.BLACK;
   assert.equal(G.isForbiddenMove(t, 7, 7, G.BLACK, 5, "freestyle"), false, "自由規則黑棋三三非禁手");
 });
+
+test("isForbiddenMove：標準規則下黑棋長連／四四／三三皆非禁手", () => {
+  // 長連：3 連 + 2 連（隔一格），下 (7,10) 成 6 連
+  var o = G.emptyBoard(15);
+  o[7][7] = G.BLACK; o[7][8] = G.BLACK; o[7][9] = G.BLACK;
+  o[7][11] = G.BLACK; o[7][12] = G.BLACK;
+  assert.equal(G.isForbiddenMove(o, 7, 10, G.BLACK, 5, "standard"), false, "標準規則黑棋長連非禁手");
+  assert.equal(G.forbiddenReason(o, 7, 10, G.BLACK, 5, "standard"), null, "標準規則黑棋長連無禁手類型");
+  // 四四：(7,7) 同時成橫向與縱向四
+  var e = G.emptyBoard(15);
+  e[7][8] = G.BLACK; e[7][9] = G.BLACK; e[7][10] = G.BLACK;
+  e[6][7] = G.BLACK; e[5][7] = G.BLACK; e[4][7] = G.BLACK;
+  assert.equal(G.isForbiddenMove(e, 7, 7, G.BLACK, 5, "standard"), false, "標準規則黑棋四四非禁手");
+  // 三三：(7,7) 同時成橫向與縱向活三
+  var t = G.emptyBoard(15);
+  t[7][5] = G.BLACK; t[7][6] = G.BLACK;
+  t[5][7] = G.BLACK; t[6][7] = G.BLACK;
+  assert.equal(G.isForbiddenMove(t, 7, 7, G.BLACK, 5, "standard"), false, "標準規則黑棋三三非禁手");
+});
+
+test("place 標準規則（中等）：黑白長連皆不算勝、黑棋無禁手、遊戲繼續", () => {
+  var g = G.createGame({ vsAI: false, difficulty: "medium" });
+  g.place(7, 7, G.BLACK); g.place(0, 0, G.WHITE);
+  g.place(7, 8, G.BLACK); g.place(0, 5, G.WHITE);
+  g.place(7, 9, G.BLACK); g.place(1, 2, G.WHITE);
+  g.place(7, 11, G.BLACK); g.place(2, 9, G.WHITE);
+  g.place(7, 12, G.BLACK); g.place(3, 4, G.WHITE);
+  // (7,10) → 6 連：標準規則僅精準五連為勝，長連不算勝；黑棋無禁手，故不判負，繼續下
+  var r = g.place(7, 10, G.BLACK);
+  assert.equal(r, true, "黑棋長連可下");
+  assert.equal(g.winner, null, "標準規則下黑棋長連不算勝");
+  assert.equal(g.forbidden, false, "標準規則黑棋無禁手");
+  assert.equal(g.board[7][10], G.BLACK, "黑棋已落子");
+  assert.equal(g.currentPlayer(), G.WHITE, "換白棋繼續");
+});

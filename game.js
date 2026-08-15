@@ -200,7 +200,7 @@ function () {
   function forbiddenReasonPlaced(board, x, y, who, min, ruleset) {
     min = min || 5;
     if (who !== BLACK) return null;
-    if (ruleset === "freestyle") return null;                  // 自由規則：黑棋無禁手
+    if (ruleset === "freestyle" || ruleset === "standard") return null; // 自由／標準規則：黑棋無禁手（僅連珠有禁手）
     if (isFive(board, x, y, who, min)) return null;            // 先五為勝，不計禁手
     if (isOverline(board, x, y, who, min)) return "overline";
     if (isDoubleFour(board, x, y, who, min)) return "doubleFour";
@@ -277,10 +277,11 @@ function () {
     return out;
    }
 
-    // 候選格中排除黑棋禁手；白棋、自由規則或全數被禁時回傳原候選（交由 place 依規則處理）。
+    // 候選格中排除黑棋禁手（僅連珠規則）；白棋或自由／標準規則時回傳原候選
+    //（交由 place 依規則處理）；全數被禁時亦回傳原候選。
   function legalCandidates(board, who, min, radius, ruleset) {
     var cs = candidateCells(board, radius);
-    if (who !== BLACK || ruleset === "freestyle") return cs;
+    if (who !== BLACK || ruleset === "freestyle" || ruleset === "standard") return cs;
     var ok = [];
     for (var i = 0; i < cs.length; i++) {
       if (!isForbiddenMove(board, cs[i][0], cs[i][1], who, min, ruleset)) ok.push(cs[i]);
@@ -518,7 +519,7 @@ function () {
       game.moves.push({ x: x, y: y, player: player });
       // 先五為勝：依難度規則集判勝——
       // 自由（簡單）黑白長連皆勝；連珠（困難）白棋長連勝、黑棋僅精準五連；
-      // 標準（中等）黑白皆僅精準五連。黑棋禁手僅在非自由規則下適用。
+      // 標準（中等）黑白皆僅精準五連（長連不算勝）。黑棋禁手僅在連珠規則下適用。
       var ruleset = rulesetFor(game.difficulty);
       var line = winLineForRules(game.board, x, y, player, winLength, ruleset);
       if (line) {
@@ -527,7 +528,7 @@ function () {
         game.turn = null;
         return true;
         }
-      // 黑棋禁手：長連／四四／三三（五連勝利優先；白棋不受限；自由規則無禁手）。
+      // 黑棋禁手：長連／四四／三三（僅連珠規則；五連勝利優先；白棋不受限）。
       if (player === BLACK) {
         var reason = forbiddenReasonPlaced(game.board, x, y, BLACK, winLength, ruleset);
         if (reason) {
