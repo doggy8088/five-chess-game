@@ -150,9 +150,6 @@ button.btn.primary{ background:linear-gradient(180deg,var(--accent),#e85f40); bo
 #stats .row{ display:flex; justify-content:space-between; align-items:center; font-size:13px; }
 #stats .row .k{ color:var(--ink-dim); letter-spacing:.03em; }
 #stats .row .v{ font-variant-numeric:tabular-nums; font-weight:700; }
-#stats .barwrap{ height:6px; background:rgba(255,255,255,0.09); border-radius:99px; overflow:hidden; margin:2px 0; }
-#stats .bar{ height:100%; width:50%;
-  background:linear-gradient(90deg,var(--accent),var(--accent-2)); transition:width .35s ease; }
 #stats .status-win{ color:var(--good); }
 #stats .status-draw{ color:var(--accent-2); }
 

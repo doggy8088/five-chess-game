@@ -22,13 +22,48 @@
      gl: $("gl"), fb: $("fallback"),
      turn: $("turn"), turnDot: $("turn-dot"), turnLabel: $("turn-label"),
      sRound: $("s-round"), sStones: $("s-stones"), sBlack: $("s-black"), sWhite: $("s-white"),
-     sBar: $("s-bar"), sStatus: $("s-status"), sMode: $("s-mode"),
+     sWinrate: $("s-winrate"), sStreak: $("s-streak"), sStatus: $("s-status"), sMode: $("s-mode"),
      hint: $("hint"),
      toast: $("toast"),
      overlay: $("overlay"), ovEmoji: $("ov-emoji"), ovTitle: $("ov-title"), ovSub: $("ov-sub"),
      overlayNew: $("ov-new"), modeLabel: $("mode-label"),
      dock: $("dock"), dockClose: $("dock-close"), dockOpen: $("dock-open")
      };
+
+     /* ---------------- 對戰統計（localStorage 持久化） ---------------- */
+  var STATS_KEY = "gomoku-stats-v1";
+  function loadStats() {
+      try {
+        var raw = localStorage.getItem(STATS_KEY);
+        if (raw) {
+          var s = JSON.parse(raw);
+          if (typeof s.wins === "number" && typeof s.losses === "number" && typeof s.draws === "number") {
+            s.streak = s.streak || 0; s.best = s.best || 0;
+            return s;
+          }
+        }
+      } catch (e) { /* 忽略損壞的資料 */ }
+      return { wins: 0, losses: 0, draws: 0, streak: 0, best: 0 };
+    }
+  function saveStats() {
+      try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch (e) { /* 忽略 */ }
+    }
+  var stats = loadStats();
+  var statsSnapshot = null;   // 本局結果記錄前的快照（悔棋時還原）
+
+  function recordResult(w) {
+      statsSnapshot = { wins: stats.wins, losses: stats.losses, draws: stats.draws, streak: stats.streak, best: stats.best };
+      if (w === G.BLACK) { stats.wins++; stats.streak++; }
+      else if (w === G.WHITE) { stats.losses++; stats.streak = 0; }
+      else { stats.draws++; stats.streak = 0; }
+      if (stats.streak > stats.best) stats.best = stats.streak;
+      saveStats();
+    }
+  function revertResult() {
+      if (!statsSnapshot) return;
+      stats = statsSnapshot; statsSnapshot = null;
+      saveStats();
+    }
 
      /* ---------------- 座標系統 (3D 與 2D 共用) ---------------- */
   var HALF = (SIZE - 1) / 2;
@@ -446,6 +481,7 @@
 
   function finish() {
       var w = game.winner;
+      if (game.vsAI) recordResult(w);   // 僅對戰 AI 時記錄（人類持黑）
       var emoji = "🏆", title = "黑棋獲勝", sub = "五子連連", color = 0xffcf5a;
       if (w === G.WHITE) { title = "白棋獲勝"; emoji = "⚪"; }
       else if (w === "draw") { title = "和棋"; emoji = "🤝"; sub = "棋盤已滿"; }
@@ -496,8 +532,14 @@
       els.sStones.textContent = (bcnt + wcnt) + " / " + (SIZE * SIZE);
       els.sBlack.textContent = bcnt;
       els.sWhite.textContent = wcnt;
-      var total = bcnt + wcnt;
-      els.sBar.style.width = (total ? (bcnt / total * 100) : 50) + "%";
+      if (game.vsAI) {
+        var decisive = stats.wins + stats.losses;
+        els.sWinrate.textContent = decisive ? Math.round(stats.wins / decisive * 100) + "%" : "–";
+        els.sStreak.textContent = stats.streak + (stats.best > stats.streak ? "（最佳 " + stats.best + "）" : "");
+      } else {
+        els.sWinrate.textContent = "–";
+        els.sStreak.textContent = "–";
+      }
 
       els.sStatus.textContent = "進行中";
       els.sStatus.className = "v";
@@ -536,7 +578,9 @@
        $("btn-new").addEventListener("click", newGame);
        els.overlayNew.addEventListener("click", newGame);
        $("btn-undo").addEventListener("click", function () {
+        var wasOver = game.isOver();
         if (!game.undo()) return;
+        if (wasOver) revertResult();   // 悔棋退回已記錄的結果
         hideOverlay();
         rewindAll();
         refresh();
@@ -577,6 +621,7 @@
         // 公開 API：方便除錯與測試（非 UI 必需）
     window.GomokuApp = {
       get game() { return game; },
+      get stats() { return stats; },
       place: function (x, y) { placeAt({ x: x, y: y }); },
       finish: finish,
       refresh: refresh,

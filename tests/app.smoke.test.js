@@ -55,6 +55,12 @@ function installDom(innerW, innerH) {
     addEventListener(t, fn) { (this.events[t] = this.events[t] || []).push(fn); },
     dispatchResize() { (this.events.resize || []).forEach((f) => f()); }
     };
+  var store = {};
+  global.localStorage = {
+    getItem: (k) => (k in store ? store[k] : null),
+    setItem: (k, v) => { store[k] = String(v); },
+    removeItem: (k) => { delete store[k]; }
+    };
   global.document = {
     readyState: "complete",
     getElementById: byId,
@@ -147,4 +153,32 @@ test("app 勝負浮層：finish() 設定狀態與浮層", () => {
   assert.equal(g.winner, G.BLACK);
   API.finish();
   assert.equal(status.textContent, "黑棋勝");
+});
+
+// 勝率／連勝統計：對戰 AI 勝局記錄、悔棋還原（需放在最後，統計為全域狀態）
+test("app 統計：勝局記錄勝率與連勝，悔棋還原", async () => {
+  var API = global.window.GomokuApp;
+  var winrate = DOM.getElementById("s-winrate");
+  var streak = DOM.getElementById("s-streak");
+  API.newGame();
+  API.game.vsAI = true; API.game.humanPlayer = G.BLACK; API.game.aiPlayer = G.WHITE;
+  API.refresh();
+  assert.equal(winrate.textContent, "–", "無對局時勝率顯示 –");
+  assert.equal(streak.textContent, "0", "無對局時連勝 0");
+
+  var g = API.game;
+  g.place(5, 7, G.BLACK); g.place(6, 7, G.BLACK); g.place(7, 7, G.BLACK);
+  g.place(8, 7, G.BLACK); g.place(9, 7, G.BLACK);
+  assert.equal(g.winner, G.BLACK);
+  API.finish();
+  assert.equal(winrate.textContent, "100%", "勝局後勝率 100%");
+  assert.equal(streak.textContent, "1", "勝局後連勝 1");
+  assert.equal(API.stats.wins, 1);
+
+  // 悔棋退回已記錄的結果
+  DOM.getElementById("btn-undo").dispatch("click");
+  assert.equal(winrate.textContent, "–", "悔棋後勝率還原");
+  assert.equal(streak.textContent, "0", "悔棋後連勝還原");
+  assert.equal(API.stats.wins, 0);
+  await sleep(330);   // 等悔棋後觸發的 AI 落子完成
 });
