@@ -199,4 +199,4 @@ npm run serve
 
 ## 授權
 
-[MIT](LICENSE) © doggy8088
+[MIT](LICENSE) © Will 保哥
