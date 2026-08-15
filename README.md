@@ -4,7 +4,7 @@
 
 - **線上試玩**：<https://five-chess-game.gh.miniasp.com/>
 - **原始碼**：<https://github.com/doggy8088/five-chess-game>
-- **作者**：[doggy8088](https://github.com/doggy8088) · **授權**：MIT
+- **作者**：[Will 保哥](https://www.facebook.com/will.fans/) · **授權**：MIT
 
 ---
 
