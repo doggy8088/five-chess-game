@@ -82,6 +82,13 @@ function () {
     return null;
    }
 
+    // 依規則決定勝負連線：連珠（renjuRules）下白棋長連（≥min）算勝，
+    // 其餘情形（含黑棋）僅「精準五連（剛好 min）」為勝。
+  function winLineForRules(board, x, y, who, min, renjuRules) {
+    if (who === WHITE && renjuRules) return winningLine(board, x, y, who, min);
+    return winningFiveLine(board, x, y, who, min);
+   }
+
     /* ---- 黑棋禁手：三三・四四・長連 偵測 ----
      * 三三（雙活三）：同一手同時形成兩個以上的活三。
      * 四四（雙四）：同一手同時形成兩個以上的四（活四或衝四）。
@@ -286,12 +293,12 @@ function () {
    }
 
     // 若 `who` 可立即勝出，回傳該落子點；否則 null。
-  function findWinningMove(board, who, min) {
+  function findWinningMove(board, who, min, renjuRules) {
     var cands = candidateCells(board, 1);
     for (var i = 0; i < cands.length; i++) {
       var c = cands[i];
       board[c[0]][c[1]] = who;
-      var win = winningFiveLine(board, c[0], c[1], who, min);
+      var win = winLineForRules(board, c[0], c[1], who, min, renjuRules);
       board[c[0]][c[1]] = EMPTY;
       if (win) return [c[0], c[1]];
       }
@@ -370,7 +377,7 @@ function () {
 
   // 威脅感知的 alpha-beta 搜索（困難等級用）。
   // depth 預設 3 手：本方→對方反擊→本方，足以看穿活叉與雙 threat。
-  function minimax(board, ai, human, min, depth) {
+  function minimax(board, ai, human, min, depth, renjuRules) {
     min = min || 5;
     depth = depth || 3;
     var BUDGET = 0x100000;                         // 節點上限，避免極端局勢失控
@@ -386,7 +393,7 @@ function () {
     }
     function search(board, me, opp, d, alpha, beta) {
       if (nodes++ > BUDGET) return null;           // 節點用盡：回傳 null 由上層略過
-      var win = findWinningMove(board, me, min);
+      var win = findWinningMove(board, me, min, renjuRules);
       if (win) return { move: win, v: 10000000 - (depth - d) }; // 越快取殺分越高
       var cands = ordered(board, me, opp);
       if (!cands) return { move: null, v: 0 };
@@ -416,27 +423,28 @@ function () {
   function chooseMove(board, ai, human, min, difficulty) {
     difficulty = difficulty || "hard";
     min = min || 5;
+    var renjuRules = difficulty === "hard";   // 困難模式採日規／國際連珠：白棋長連算勝
     if (candidateCells(board, 2).length === 0) {
       var c = (board.length - 1) >> 1;
       return [c, c];
       }
-    var block = findWinningMove(board, human, min); // 擋对手的殺著
+    var block = findWinningMove(board, human, min, renjuRules); // 擋对手的殺著
 
     if (difficulty === "easy") {
       if (Math.random() < 0.6 && block && !isForbiddenMove(board, block[0], block[1], ai, min)) return block;
       return greedyMove(board, ai, human, min, 1.6);
       }
     if (difficulty === "medium") {
-      var win = findWinningMove(board, ai, min);
+      var win = findWinningMove(board, ai, min, renjuRules);
       if (win) return win;
       if (block && !isForbiddenMove(board, block[0], block[1], ai, min)) return block;
       return greedyMove(board, ai, human, min, 0);
       }
       // hard
-    var hw = findWinningMove(board, ai, min);
+    var hw = findWinningMove(board, ai, min, renjuRules);
     if (hw) return hw;
     if (block && !isForbiddenMove(board, block[0], block[1], ai, min)) return block;
-    var m = minimax(board, ai, human, min);
+    var m = minimax(board, ai, human, min, 3, renjuRules);
     if (m && ai === BLACK && isForbiddenMove(board, m[0], m[1], ai, min)) m = greedyMove(board, ai, human, min, 0);
     return m || greedyMove(board, ai, human, min, 0);
    }
@@ -499,8 +507,10 @@ function () {
       player = player || game.turn;
       game.board[x][y] = player;
       game.moves.push({ x: x, y: y, player: player });
-      // 先五為勝：黑白皆以「精準五連」為勝（黑棋長連不算勝，為禁手）。
-      var line = winningFiveLine(game.board, x, y, player, winLength);
+      // 先五為勝：黑棋僅「精準五連」為勝（長連為禁手）；
+      // 困難（連珠）模式下白棋長連（≥五）也算勝。
+      var renju = game.difficulty === "hard";
+      var line = winLineForRules(game.board, x, y, player, winLength, renju);
       if (line) {
         game.winner = player;
         game.winLine = line;
@@ -607,6 +617,7 @@ function () {
   Game.isFourThrough = isFourThrough;
   Game.isDoubleFour = isDoubleFour;
   Game.winningFiveLine = winningFiveLine;
+  Game.winLineForRules = winLineForRules;
   Game.forbiddenReasonPlaced = forbiddenReasonPlaced;
   Game.forbiddenReason = forbiddenReason;
   Game.isForbiddenMove = isForbiddenMove;
