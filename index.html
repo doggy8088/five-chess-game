@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>五子棋 · Five Chess</title>
+<link rel="stylesheet" href="styles.css" />
+
+<!-- three.js 是唯一的第三方資源，由 CDN 載入（不用 build、無本地相依）。
+     若離線／被擋住時，頁面會自動改用 2D Canvas 渲染，確保始終可玩。 -->
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+</head>
+<body>
+<div id="stage">
+   <canvas id="gl"></canvas>
+   <canvas id="fallback"></canvas>
+   <div id="grade"></div>
+</div>
+
+<header class="top">
+   <div class="brand">
+     <h1>GOMOKU</h1>
+     <span class="cn">五子棋 · 見賢思齊</span>
+   </div>
+</header>
+
+<div id="hud">
+   <div class="turn active" id="turn">
+     <span class="dot stone-black" id="turn-dot"></span>
+     <span class="who" id="turn-label">輪到黑棋</span>
+   </div>
+</div>
+
+<aside id="stats">
+   <div class="row"><span class="k">局數</span><span class="v" id="s-round">1</span></div>
+   <div class="row"><span class="k">子數</span><span class="v" id="s-stones">0 / 225</span></div>
+   <div class="row"><span class="k">黑棋</span><span class="v" id="s-black">0</span></div>
+   <div class="row"><span class="k">白棋</span><span class="v" id="s-white">0</span></div>
+   <div class="barwrap"><div class="bar" id="s-bar"></div></div>
+   <div class="row"><span class="k">狀態</span><span class="v" id="s-status">進行中</span></div>
+   <div class="row"><span class="k">對戰</span><span class="v" id="s-mode">對戰 AI（困難）</span></div>
+</aside>
+
+<div id="dock">
+   <div class="seg" role="group" aria-label="難度">
+     <button data-diff="easy" aria-pressed="false">簡單</button>
+     <button data-diff="medium" aria-pressed="false">中等</button>
+     <button data-diff="hard" aria-pressed="true">困難</button>
+   </div>
+   <div class="divider"></div>
+   <button class="btn primary" id="btn-new">
+     <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3.5 7.1"/><path d="M3 22v-6h6"/></svg>
+     新局
+   </button>
+   <button class="btn" id="btn-undo">
+     <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a6 6 0 0 1 0 12h-4"/></svg>
+     撤銷
+   </button>
+   <button class="btn" id="btn-mode" title="切換 AI／雙人類">
+     <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="12" rx="2"/><path d="M12 7V4M9 12h.01M15 12h.01"/></svg>
+     <span id="mode-label">對戰 AI</span>
+   </button>
+</div>
+
+<div id="hint">點擊棋盤落子 · 捲動縮放 · 拖曳旋轉棋盤</div>
+
+<div id="overlay">
+   <div class="card">
+     <div class="emoji" id="ov-emoji">🏆</div>
+     <h2 id="ov-title">黑棋獲勝</h2>
+     <p id="ov-sub">五子連連</p>
+     <button class="btn primary" id="ov-new">再下一局</button>
+   </div>
+</div>
+
+<script src="game.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
