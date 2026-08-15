@@ -298,6 +298,99 @@ test("regression：威脅型人類再無法輕鬆贏困難 AI（困難不應弱�
 });
 
 // ------------------------------------------------------------
+// 跳型棋型（斷點威脅）與必殺威脅攻防
+// ------------------------------------------------------------
+test("threatScore 辨識跳活三 ●●_●（不再被當成散子低估）", () => {
+  var contig = G.emptyBoard(15);
+  contig[7][5] = G.BLACK; contig[7][6] = G.BLACK; contig[7][7] = G.BLACK;      // 連續活三
+  var gap = G.emptyBoard(15);
+  gap[7][5] = G.BLACK; gap[7][6] = G.BLACK; gap[7][8] = G.BLACK;               // 跳活三 ●●_●
+  var loose = G.emptyBoard(15);
+  loose[7][5] = G.BLACK; loose[7][6] = G.BLACK;                                 // 僅活二
+  var sc = G.threatScore(contig, G.BLACK, 5), sg = G.threatScore(gap, G.BLACK, 5);
+  assert.ok(sg > G.threatScore(loose, G.BLACK, 5), "跳活三威脅應高於活二");
+  assert.ok(sg >= sc * 0.5, "跳活三與連續活三應為同一量級（sg=" + sg + ", sc=" + sc + "）");
+});
+
+test("threatScore 辨識跳四 ●●_●●（與連續四同級）", () => {
+  var contig = G.emptyBoard(15);
+  contig[7][5] = G.BLACK; contig[7][6] = G.BLACK; contig[7][7] = G.BLACK; contig[7][8] = G.BLACK;
+  var gap = G.emptyBoard(15);
+  gap[7][5] = G.BLACK; gap[7][6] = G.BLACK; gap[7][8] = G.BLACK; gap[7][9] = G.BLACK;   // ●●_●●
+  var sg = G.threatScore(gap, G.BLACK, 5);
+  assert.ok(sg >= G.threatScore(contig, G.BLACK, 5) * 0.5, "跳四應與連續四同級");
+  assert.equal(G.threatScore(gap, G.WHITE, 5), 0, "對手無子時威脅為 0");
+});
+
+test("threatScore 空盤與單子為 0（維持 evalBoard 的平衡基準）", () => {
+  var b = G.emptyBoard(15);
+  assert.equal(G.threatScore(b, G.BLACK, 5), 0);
+  b[7][7] = G.WHITE;
+  assert.equal(G.threatScore(b, G.WHITE, 5), 0, "孤子不構成威脅");
+});
+
+test("threatScore 非 5 連規則沿用連續棋型計數（min ≠ 5 備援）", () => {
+  var b = G.emptyBoard(10);
+  b[5][3] = G.BLACK; b[5][4] = G.BLACK; b[5][5] = G.BLACK;     // 以 min=4 而言為「四缺一」的活三
+  var s3 = G.threatScore(b, G.BLACK, 4);
+  b[5][6] = G.BLACK;                                            // 湊滿 4 連
+  var s4 = G.threatScore(b, G.BLACK, 4);
+  assert.ok(s3 > 0, "min=4 時活三仍有分數");
+  assert.ok(s4 > s3, "min=4 時成連分數更高");
+  assert.equal(G.threatScore(G.emptyBoard(10), G.BLACK, 4), 0);
+});
+
+test("winningMoveCount 數出立即取勝點的數量", () => {
+  var b = G.emptyBoard(15);
+  b[7][5] = G.BLACK; b[7][6] = G.BLACK; b[7][7] = G.BLACK; b[7][8] = G.BLACK;   // 活四：兩端皆可成五
+  assert.equal(G.winningMoveCount(b, G.BLACK, 5, "renju"), 2);
+  assert.equal(G.winningMoveCount(b, G.WHITE, 5, "renju"), 0);
+});
+
+test("unstoppableMoves 找出活四與跳四的必殺點", () => {
+  var open = G.emptyBoard(15);
+  open[7][6] = G.BLACK; open[7][7] = G.BLACK; open[7][8] = G.BLACK;             // 活三 → 兩端可成活四
+  var ks = G.unstoppableMoves(open, G.BLACK, 5, "renju");
+  assert.ok(ks.length > 0, "活三應存在必殺點");
+  assert.ok(ks.some(function (c) { return c[0] === 7 && (c[1] === 5 || c[1] === 9); }), "必殺點在活三兩端");
+
+  var gap = G.emptyBoard(15);
+  gap[7][5] = G.BLACK; gap[7][6] = G.BLACK; gap[7][8] = G.BLACK;                // 跳活三 ●●_●
+  assert.ok(G.unstoppableMoves(gap, G.BLACK, 5, "renju").length > 0, "跳活三也應被視為潛在必殺");
+});
+
+test("blockThreatMove 無威脅時回 null，有威脅時給出化解點", () => {
+  var calm = G.emptyBoard(15);
+  calm[7][7] = G.BLACK; calm[8][8] = G.WHITE;
+  assert.equal(G.blockThreatMove(calm, G.WHITE, G.BLACK, 5, "renju"), null, "無必殺威脅時不介入");
+
+  var b = G.emptyBoard(15);
+  b[7][6] = G.BLACK; b[7][7] = G.BLACK; b[7][8] = G.BLACK;                      // 黑活三
+  var m = G.blockThreatMove(b, G.WHITE, G.BLACK, 5, "renju");
+  assert.ok(m, "應找到化解點");
+  b[m[0]][m[1]] = G.WHITE;
+  assert.equal(G.unstoppableMoves(b, G.BLACK, 5, "renju").length, 0, "落子後對手不再有必殺點");
+});
+
+test("chooseMove 困難：會擋住跳活三 ●●_● 的斷點", () => {
+  var b = G.emptyBoard(15);
+  b[7][5] = G.BLACK; b[7][6] = G.BLACK; b[7][8] = G.BLACK;                      // 跳活三，斷點 (7,7)
+  b[9][6] = G.WHITE;
+  var m = G.chooseMove(b, G.WHITE, G.BLACK, 5, "hard");
+  b[m[0]][m[1]] = G.WHITE;
+  assert.equal(G.unstoppableMoves(b, G.BLACK, 5, "renju").length, 0, "黑方跳三威脅應被化解（AI 走 " + m + "）");
+});
+
+test("chooseMove 困難：能搶先造出必殺威脅而非被動防守", () => {
+  var b = G.emptyBoard(15);
+  b[7][6] = G.WHITE; b[7][7] = G.WHITE; b[7][8] = G.WHITE;                      // 白活三 → 可成活四
+  b[10][3] = G.BLACK; b[11][11] = G.BLACK;                                       // 黑無威脅
+  var m = G.chooseMove(b, G.WHITE, G.BLACK, 5, "hard");
+  b[m[0]][m[1]] = G.WHITE;
+  assert.ok(G.winningMoveCount(b, G.WHITE, 5, "renju") >= 2, "AI 應造出對手擋不住的雙取勝點");
+});
+
+// ------------------------------------------------------------
 // createGame：控制器
 // ------------------------------------------------------------
 test("createGame 選項與預設", () => {

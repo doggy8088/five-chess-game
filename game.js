@@ -315,6 +315,56 @@ function () {
     return null;
    }
 
+    // `who` 目前有幾個「立即取勝點」（下一手就能成五的空格）。
+  function winningMoveCount(board, who, min, ruleset) {
+    var cands = candidateCells(board, 1), n = 0;
+    for (var i = 0; i < cands.length; i++) {
+      var c = cands[i];
+      board[c[0]][c[1]] = who;
+      var win = winLineForRules(board, c[0], c[1], who, min, ruleset);
+      board[c[0]][c[1]] = EMPTY;
+      if (win) n++;
+      }
+    return n;
+   }
+
+    /* ---- 必殺威脅（活四／雙四）----
+     * 「必殺點」＝下在該處後，會同時出現兩個以上的立即取勝點，對手只能擋一個。
+     * 此定義同時涵蓋連續活四 ●●●● 與跳四 ●●_●● 等斷點棋型，
+     * 且會依規則集排除黑棋禁手（禁手手不算真威脅）。
+     */
+  function unstoppableMoves(board, who, min, ruleset) {
+    var cands = candidateCells(board, 2), out = [];
+    for (var i = 0; i < cands.length; i++) {
+      var c = cands[i];
+      if (isForbiddenMove(board, c[0], c[1], who, min, ruleset)) continue;
+      board[c[0]][c[1]] = who;
+      var already = winLineForRules(board, c[0], c[1], who, min, ruleset);
+      var n = already ? 0 : winningMoveCount(board, who, min, ruleset);
+      board[c[0]][c[1]] = EMPTY;
+      if (n >= 2) out.push([c[0], c[1]]);
+      }
+    return out;
+   }
+
+    // 找出能化解對手所有必殺威脅的落點；若無解（已成死局）回傳 null。
+    // 於多個可行解中取 scoreCell 最高者，兼顧防守與己方發展。
+  function blockThreatMove(board, ai, human, min, ruleset) {
+    if (unstoppableMoves(board, human, min, ruleset).length === 0) return null;
+    var cands = candidateCells(board, 2), best = null, bestScore = -Infinity;
+    for (var i = 0; i < cands.length; i++) {
+      var c = cands[i];
+      if (isForbiddenMove(board, c[0], c[1], ai, min, ruleset)) continue;
+      board[c[0]][c[1]] = ai;
+      var safe = winningMoveCount(board, human, min, ruleset) === 0 &&
+                 unstoppableMoves(board, human, min, ruleset).length === 0;
+      var s = safe ? scoreCell(board, c[0], c[1], ai, human, min) : 0;
+      board[c[0]][c[1]] = EMPTY;
+      if (safe && s > bestScore) { bestScore = s; best = c; }
+      }
+    return best;
+   }
+
     // 貪婪最佳手 (jitter>0 加入隨機性，用於「簡單」等級)。
   function greedyMove(board, ai, human, min, jitter, ruleset) {
     var cands = legalCandidates(board, ai, min, 2, ruleset);
@@ -343,12 +393,10 @@ function () {
    // 防禦權重：對手 threat 比本方略高，避免被活叉／雙 threat 反殺。
   var DEFENSE_W = 1.2;
 
-   // 威脅感知評估：數出該色的「活棋」（活三／活四／活叉）。
-   // 活四＝下一手必殺；兩個活三（或活三＋活四）＝活叉，幾乎必勝，故權重極高。
+   // 只數「連續」棋型的威脅統計（min ≠ 5 時的通用備援）。
    // 每條線僅從其「第一顆」計數，同一方向不重複加總。
-  function threatScore(board, who, min) {
-    min = min || 5;
-    var size = board.length, four = 0, openThree = 0, three = 0, openTwo = 0;
+  function threatCountsRuns(board, who, min) {
+    var size = board.length, c = { four: 0, openThree: 0, three: 0, openTwo: 0 };
     for (var x = 0; x < size; x++) {
       for (var y = 0; y < size; y++) {
         if (board[x][y] !== who) continue;
@@ -361,22 +409,84 @@ function () {
           while (inBounds(size, nx, ny) && board[nx][ny] === who) { cnt++; nx += dx; ny += dy; }
           var endA = inBounds(size, nx, ny) && board[nx][ny] === EMPTY;
           var endB = inBounds(size, px, py) && board[px][py] === EMPTY;
-          if (cnt >= min) four += 2;                  // 已成型或將成五連
-          else if (cnt === 4) {
-            if (endA && endB) four += 2;             // 活四：兩端皆活，下一步必殺
-            else if (endA || endB) four += 1;       // 帶擋／單邊四
-          } else if (cnt === 3) {
-            if (endA && endB) openThree += 1;         // 活三
-            else if (endA || endB) three += 1;       // 半活三
-          } else if (cnt === 2) {
-            if (endA && endB) openTwo += 1;          // 活雙
+          if (cnt >= min) c.four += 2;                 // 已成型或將成五連
+          else if (cnt === min - 1) {
+            if (endA && endB) c.four += 2;            // 活四：兩端皆活，下一步必殺
+            else if (endA || endB) c.four += 1;      // 帶擋／單邊四
+          } else if (cnt === min - 2) {
+            if (endA && endB) c.openThree += 1;        // 活三
+            else if (endA || endB) c.three += 1;      // 半活三
+          } else if (cnt === min - 3) {
+            if (endA && endB) c.openTwo += 1;         // 活雙
           }
         }
       }
     }
-    var s = four * 100000 + openThree * 12000 + three * 1500 + openTwo * 150;
-    if (openThree >= 2) s += 40000;                 // 活叉：兩個活三
-    if (openThree + four >= 2) s += 20000;         // 活三再疊其他活 threat
+    return c;
+  }
+
+   /* ---- 樣式式（pattern）威脅統計 ----
+    * 舊版僅辨識「連續」棋子，跳三 ●●_● 這類帶斷點的棋型會被嚴重低估
+    *（●●● 記 12000 分，●●_● 卻只有 150 分），導致 AI 漏擋。
+    * 以下改為整條線做樣式比對，連續型與跳型一併辨識。
+    * 1＝該色、2＝對手或牆、0＝空格；比對到的棋子會被標記消耗，避免同一批子重複計分。
+    */
+  var PATTERN_GROUPS = [
+    { key: "four",      res: [/11111/, /011110/, /011112/, /211110/, /10111/, /11011/, /11101/] },
+    { key: "openThree", res: [/011100/, /001110/, /011010/, /010110/] },
+    { key: "three",     res: [/001112/, /211100/, /010112/, /211010/, /011012/, /210110/, /10011/, /11001/, /10101/] },
+    { key: "openTwo",   res: [/001100/, /001010/, /010100/] }
+  ];
+
+   // 取出棋盤所有長度 >= min 的線（橫、直、兩對角），每條為格值陣列。
+  function boardLines(board, min) {
+    var n = board.length, lines = [], x, y, s, a, b, y1, y2;
+    for (x = 0; x < n; x++) lines.push(board[x].slice());
+    for (y = 0; y < n; y++) { var col = []; for (x = 0; x < n; x++) col.push(board[x][y]); lines.push(col); }
+    for (s = -(n - 1); s < n; s++) {
+      a = []; b = [];
+      for (x = 0; x < n; x++) {
+        y1 = x - s; y2 = s - x + n - 1;
+        if (y1 >= 0 && y1 < n) a.push(board[x][y1]);
+        if (y2 >= 0 && y2 < n) b.push(board[x][y2]);
+      }
+      if (a.length >= min) lines.push(a);
+      if (b.length >= min) lines.push(b);
+    }
+    return lines;
+  }
+
+   // 以樣式比對統計 who 的威脅棋型（僅適用 min === 5）。
+  function threatCountsPattern(board, who) {
+    var opp = opponentOf(who), c = { four: 0, openThree: 0, three: 0, openTwo: 0 };
+    var lines = boardLines(board, 5);
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i], str = "2";                 // 頭尾補牆，讓邊界等同被擋
+      for (var j = 0; j < line.length; j++) str += line[j] === who ? "1" : (line[j] === opp ? "2" : "0");
+      str += "2";
+      for (var g = 0; g < PATTERN_GROUPS.length; g++) {
+        var grp = PATTERN_GROUPS[g];
+        for (var r = 0; r < grp.res.length; r++) {
+          var m;
+          while ((m = str.match(grp.res[r])) !== null) {
+            c[grp.key]++;
+             // 消耗已計分的棋子（標記為 2），避免同一批子被較低階棋型重複計算
+            str = str.slice(0, m.index) + m[0].replace(/1/g, "2") + str.slice(m.index + m[0].length);
+          }
+        }
+      }
+    }
+    return c;
+  }
+
+   // 威脅感知評估：數出該色的「活棋」（活三／活四／活叉），含跳三、跳四等斷點棋型。
+   // 活四＝下一手必殺；兩個活三（或活三＋活四）＝活叉，幾乎必勝，故權重極高。
+  function threatScore(board, who, min) {
+    min = min || 5;
+    var c = min === 5 ? threatCountsPattern(board, who) : threatCountsRuns(board, who, min);
+    var s = c.four * 100000 + c.openThree * 12000 + c.three * 1500 + c.openTwo * 150;
+    if (c.openThree >= 2) s += 40000;                // 活叉：兩個活三
+    if (c.openThree + c.four >= 2) s += 20000;      // 活三再疊其他活 threat
     return s;
   }
 
@@ -454,6 +564,19 @@ function () {
     var hw = findWinningMove(board, ai, min, ruleset);
     if (hw) return hw;
     if (block && !isForbiddenMove(board, block[0], block[1], ai, min, ruleset)) return block;
+      // 己方可先造出必殺威脅（活四／雙四）→ 主動搶先，不必被動防守
+    var kills = unstoppableMoves(board, ai, min, ruleset);
+    if (kills.length) {
+      var kbest = kills[0], kscore = -Infinity;
+      for (var ki = 0; ki < kills.length; ki++) {
+        var ks = scoreCell(board, kills[ki][0], kills[ki][1], ai, human, min);
+        if (ks > kscore) { kscore = ks; kbest = kills[ki]; }
+        }
+      return kbest;
+      }
+      // 對手下一手可造出必殺威脅 → 明確攔截（minimax 的模糊分數常會漏擋）
+    var def = blockThreatMove(board, ai, human, min, ruleset);
+    if (def) return def;
     var m = minimax(board, ai, human, min, 3, ruleset);
     if (m && ai === BLACK && isForbiddenMove(board, m[0], m[1], ai, min, ruleset)) m = greedyMove(board, ai, human, min, 0, ruleset);
     return m || greedyMove(board, ai, human, min, 0, ruleset);
@@ -641,6 +764,10 @@ function () {
   Game.centerBias = centerBias;
   Game.scoreCell = scoreCell;
   Game.findWinningMove = findWinningMove;
+  Game.winningMoveCount = winningMoveCount;
+  Game.unstoppableMoves = unstoppableMoves;
+  Game.blockThreatMove = blockThreatMove;
+  Game.boardLines = boardLines;
   Game.greedyMove = greedyMove;
   Game.staticEval = staticEval;
   Game.threatScore = threatScore;
