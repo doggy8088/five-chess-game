@@ -3,7 +3,65 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>五子棋 · Five Chess</title>
+<title>五子棋 · Five Chess — 3D Gomoku 對戰 AI</title>
+<meta name="description" content="3D 五子棋（Gomoku）網頁遊戲：15×15 棋盤、三種難度 AI 對戰與雙人模式，three.js 3D 渲染，離線自動切換 2D Canvas，免安裝、免註冊，開啟即玩。" />
+<meta name="keywords" content="五子棋, gomoku, five-in-a-row, 連珠, 3D 棋盤, three.js, AI 對戰, 雙人對戰, 網頁遊戲" />
+<meta name="author" content="doggy8088" />
+<meta name="robots" content="index, follow" />
+<meta name="theme-color" content="#0b1020" />
+<link rel="canonical" href="https://five-chess-game.gh.miniasp.com/" />
+
+<!-- OpenGraph -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="五子棋 · Five Chess" />
+<meta property="og:title" content="五子棋 · Five Chess — 3D Gomoku 對戰 AI" />
+<meta property="og:description" content="3D 五子棋（Gomoku）網頁遊戲：15×15 棋盤、三種難度 AI 對戰與雙人模式，three.js 3D 渲染，離線自動切換 2D Canvas，免安裝、免註冊，開啟即玩。" />
+<meta property="og:url" content="https://five-chess-game.gh.miniasp.com/" />
+<meta property="og:image" content="https://five-chess-game.gh.miniasp.com/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="五子棋 · Five Chess — 3D Gomoku 棋盤" />
+<meta property="og:locale" content="zh_TW" />
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="五子棋 · Five Chess — 3D Gomoku 對戰 AI" />
+<meta name="twitter:description" content="3D 五子棋（Gomoku）網頁遊戲：三種難度 AI 對戰與雙人模式，免安裝、免註冊，開啟即玩。" />
+<meta name="twitter:image" content="https://five-chess-game.gh.miniasp.com/og-image.png" />
+
+<!-- JSON-LD -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "五子棋 · Five Chess",
+  "alternateName": "Gomoku",
+  "description": "3D 五子棋（Gomoku）網頁遊戲：15×15 棋盤、三種難度 AI 對戰與雙人模式，three.js 3D 渲染，離線自動切換 2D Canvas，免安裝、免註冊，開啟即玩。",
+  "url": "https://five-chess-game.gh.miniasp.com/",
+  "applicationCategory": "GameApplication",
+  "operatingSystem": "Any",
+  "browserRequirements": "Requires JavaScript",
+  "inLanguage": "zh-Hant-TW",
+  "isAccessibleForFree": true,
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "TWD"
+  },
+  "featureList": [
+    "15×15 3D 棋盤",
+    "三種難度 AI 對戰",
+    "雙人對戰模式",
+    "2D Canvas 備援渲染"
+  ],
+  "keywords": "五子棋, gomoku, five-in-a-row, three.js",
+  "author": {
+    "@type": "Person",
+    "name": "doggy8088"
+  }
+}
+</script>
+
 <link rel="stylesheet" href="styles.css" />
 
 <!-- three.js 是唯一的第三方資源，由 CDN 載入（不用 build、無本地相依）。
