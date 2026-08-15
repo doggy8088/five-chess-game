@@ -119,6 +119,11 @@ function makeCanvas() {
   return c;
 }
 
+// 難度按鈕（供查詢 .seg [data-diff] 使用）
+var segBtns = ["easy", "medium", "hard"].map(function (d) {
+  var b = makeEl(); b.setAttribute("data-diff", d); return b;
+});
+
 let rafCb = null;
 function installDomFor3D() {
   var registry = {};
@@ -135,7 +140,7 @@ function installDomFor3D() {
   global.document = {
     readyState: "complete",
     getElementById: byId,
-    querySelectorAll() { return []; },
+    querySelectorAll(sel) { if (sel && sel.indexOf("data-diff") !== -1) return segBtns; return []; },
     createElement() { return makeCanvas(); },
     addEventListener() {}
      };
@@ -179,4 +184,50 @@ test("3D 路徑：勝局高亮與動畫", async () => {
   assert.equal(status.textContent, "黑棋勝");
   flushFrames(40);          // 執行勝局高亮動畫 (pulsing rings)
   assert.ok(API.game.isOver());
+});
+
+
+// 3D 路徑：拖曳 / 離場 / 縮放 / 難度 / 黑白和 狀態分支
+test("3D 路徑：事件、難度、勝負狀態", async () => {
+  var API = global.window.GomokuApp;
+  gl.dispatch("pointerdown", { clientX: 400, clientY: 300, buttons: 1 });
+  gl.dispatch("pointermove", { clientX: 440, clientY: 340, buttons: 1 });
+  gl.dispatch("pointerup", { clientX: 440, clientY: 340, buttons: 0 });
+  gl.dispatch("pointermove", { clientX: 400, clientY: 400, buttons: 0 });
+  gl.dispatch("pointerleave", {});
+  gl.dispatch("wheel", { deltaX: 0, deltaY: 120, preventDefault() {} });
+
+  var seg = global.document.querySelectorAll(".seg [data-diff]");
+  assert.equal(seg.length, 3);
+  seg[0].dispatch("click");
+  seg[1].dispatch("click");
+  assert.equal(API.game.difficulty, "medium");
+
+  API.newGame();
+  var g = API.game;
+  g.vsAI = false;
+  for (var i = 3; i < 8; i++) g.place(i, 7, G.WHITE);
+  assert.equal(g.winner, G.WHITE);
+  API.finish();
+  assert.equal(status.textContent, "白棋勝");
+
+  g.winner = "draw"; g.winLine = null;
+  API.refresh();
+  assert.equal(status.textContent, "和棋");
+
+  API.newGame();
+  seg[2].dispatch("click");
+  API.place(7, 7, G.BLACK);
+  assert.ok(API.game.stoneCount() >= 1);
+  await sleep(320);
+  flushFrames(40);
+  assert.ok(API.game.stoneCount() >= 2, "AI 回應");
+});
+
+// API.undo 在空棋譜上的早返回分支
+test("API.undo：空棋譜不報錯", () => {
+  var API = global.window.GomokuApp;
+  API.newGame();
+  API.undo();          // moves 為空 → 早返回
+  assert.equal(API.game.stoneCount(), 0);
 });

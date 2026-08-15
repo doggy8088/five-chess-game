@@ -380,6 +380,9 @@
       els.fb.style.display = use3D ? "none" : "block";
       view = use3D ? make3DView() : make2DView();
       view.onPick(onPick);
+      view.onHover(function (cell) {
+        // 可顯示座標提示；回呼不影響邏輯
+      });
       if (!use3D) els.hint.textContent = "已切換 2D 模式（無法載入 3D 引擎）· 點擊棋盤落子";
        }
 
