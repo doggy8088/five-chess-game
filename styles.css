@@ -201,7 +201,7 @@ button.btn.primary{ background:linear-gradient(180deg,var(--accent),#e85f40); bo
 
 @media (max-width:760px){
   #stats{ display:none; }
-  #hud{ top:auto; bottom:150px; }
+  #hud{ top:54px; bottom:auto; }
   #hint{ display:none; }
   .brand .cn{ display:none; }
   #dock{ flex-wrap:wrap; justify-content:center; max-width:92vw; }
