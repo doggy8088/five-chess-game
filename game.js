@@ -540,6 +540,88 @@ function () {
     return result.move;
   }
 
+  /* ---- 連續衝四殺（VCF, Victory by Continuous Fours）----
+   * 只搜尋「衝四」（落子後出現 ≥1 個立即取勝點）這種迫使對手回擋的著手，
+   * 分支極窄（對手回擋點通常唯一），可搜得很深，是五子棋引擎最關鍵的技術。
+   * 以下保證「致勝」為真：每個對手節點都檢查對手是否已有立即成五，
+   * 並在對手回擋後出現「反衝四」（對手也形成取勝點）時放棄該分支。
+   */
+  var VCF_DEPTH  = 10;      // 連四殺最大手數（分支近乎線性，可搜深）
+  var VCF_BUDGET = 12000;   // 節點上限，避免極端局勢失控
+
+  // 產生「衝四點」：落子後會出現 ≥1 個立即取勝點的著手。
+  // 以 evaluateCell≥10000（即形成四或更強棋型）快篩，再以 winningMoveCount 確認，
+  // 大幅縮減需逐一驗證的候選，讓 VCF 深搜保持輕快。排除黑棋禁手（連珠規則）。
+  function fourMoves(board, who, min, ruleset) {
+    var cands = candidateCells(board, 2), out = [];
+    for (var i = 0; i < cands.length; i++) {
+      var c = cands[i];
+      if (evaluateCell(board, c[0], c[1], who, min) < 10000) continue;  // 快篩：四以上才可能成衝四
+      if (isForbiddenMove(board, c[0], c[1], who, min, ruleset)) continue;
+      board[c[0]][c[1]] = who;
+      var n = winningMoveCount(board, who, min, ruleset);
+      board[c[0]][c[1]] = EMPTY;
+      if (n >= 1) out.push([c[0], c[1]]);
+      }
+    return out;
+    }
+
+  // 連續衝四殺：回傳第一手致勝著手；若無強制勝回 null。
+  // 預算用盡回 null（交由上層退回其他策略），保證不回傳非致勝著手。
+  function vcf(board, ai, human, min, ruleset, depth, budget) {
+    min = min || 5;
+    depth = depth || VCF_DEPTH;
+    budget = budget || { n: 0, max: VCF_BUDGET };
+    function solve(d) {
+      if (budget.n++ > budget.max) return null;
+      var win = findWinningMove(board, ai, min, ruleset);     // 我方立即成五
+      if (win) return win;
+      if (d <= 0) return null;
+      var fours = fourMoves(board, ai, min, ruleset);
+      for (var i = 0; i < fours.length; i++) {
+        var f = fours[i];
+        board[f[0]][f[1]] = ai;
+        if (findWinningMove(board, human, min, ruleset)) {    // 對手可立即成五 → 此衝四被反先
+          board[f[0]][f[1]] = EMPTY; continue;
+          }
+        var n = winningMoveCount(board, ai, min, ruleset);
+        if (n >= 2) { board[f[0]][f[1]] = EMPTY; return f; }  // 雙四／活四：對手擋不勝擋
+        var wp = findWinningMove(board, ai, min, ruleset);    // 唯一取勝點：對手必須回擋
+        board[wp[0]][wp[1]] = human;
+        // 回擋後若對手反成衝四（也出現取勝點）→ 攻勢被反先，放棄；否則繼續連四
+        var ok = (winningMoveCount(board, human, min, ruleset) === 0) && !!solve(d - 1);
+        board[wp[0]][wp[1]] = EMPTY;
+        board[f[0]][f[1]] = EMPTY;
+        if (ok) return f;
+        }
+      return null;
+      }
+    return solve(depth);
+    }
+
+  // 防守：對手有連續衝四殺時，找出能破壞它的著手。
+  // 逐一嘗試我方高分候選點，若落子後對手不再有 VCF（且無立即成五）即為有效防守；
+  // 於有效防守中取 scoreCell 最高者。僅在對手具備衝四點時才啟動，控制成本。
+  function defendVcf(board, ai, human, min, ruleset) {
+    if (fourMoves(board, human, min, ruleset).length === 0) return null;   // 對手無衝四點 → 無 VCF
+    if (!vcf(board, human, ai, min, ruleset)) return null;                 // 對手確無連四殺 → 不需防守
+    var cands = candidateCells(board, 2), best = null, bestScore = -Infinity;
+    cands.sort(function (a, b) { return scoreCell(board, b[0], b[1], ai, human, min) - scoreCell(board, a[0], a[1], ai, human, min); });
+    var limit = Math.min(cands.length, 14);
+    for (var i = 0; i < limit; i++) {
+      var c = cands[i];
+      if (isForbiddenMove(board, c[0], c[1], ai, min, ruleset)) continue;
+      board[c[0]][c[1]] = ai;
+      var oppWin = findWinningMove(board, human, min, ruleset);
+      var stillVcf = oppWin ? true : !!vcf(board, human, ai, min, ruleset);
+      board[c[0]][c[1]] = EMPTY;
+      if (stillVcf) continue;
+      var s = scoreCell(board, c[0], c[1], ai, human, min);
+      if (s > bestScore) { bestScore = s; best = c; }
+      }
+    return best;
+    }
+
   function chooseMove(board, ai, human, min, difficulty) {
     difficulty = difficulty || "hard";
     min = min || 5;
@@ -574,9 +656,15 @@ function () {
         }
       return kbest;
       }
+      // 進攻：連續衝四殺（VCF）— 深度搜索強制連四取勝（活四／雙四以外的多手必殺）
+    var vwin = vcf(board, ai, human, min, ruleset);
+    if (vwin && !isForbiddenMove(board, vwin[0], vwin[1], ai, min, ruleset)) return vwin;
       // 對手下一手可造出必殺威脅 → 明確攔截（minimax 的模糊分數常會漏擋）
     var def = blockThreatMove(board, ai, human, min, ruleset);
     if (def) return def;
+      // 對手有連續衝四殺（VCF）→ 必須破壞其強制勝序列
+    var dv = defendVcf(board, ai, human, min, ruleset);
+    if (dv && !isForbiddenMove(board, dv[0], dv[1], ai, min, ruleset)) return dv;
     var m = minimax(board, ai, human, min, 3, ruleset);
     if (m && ai === BLACK && isForbiddenMove(board, m[0], m[1], ai, min, ruleset)) m = greedyMove(board, ai, human, min, 0, ruleset);
     return m || greedyMove(board, ai, human, min, 0, ruleset);
@@ -767,6 +855,9 @@ function () {
   Game.winningMoveCount = winningMoveCount;
   Game.unstoppableMoves = unstoppableMoves;
   Game.blockThreatMove = blockThreatMove;
+  Game.fourMoves = fourMoves;
+  Game.vcf = vcf;
+  Game.defendVcf = defendVcf;
   Game.boardLines = boardLines;
   Game.greedyMove = greedyMove;
   Game.staticEval = staticEval;

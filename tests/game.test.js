@@ -391,6 +391,75 @@ test("chooseMove 困難：能搶先造出必殺威脅而非被動防守", () => 
 });
 
 // ------------------------------------------------------------
+// 連續衝四殺（VCF）：困難等級的深層戰術（多手後的強制勝）
+// ------------------------------------------------------------
+test("fourMoves 只列出形成「衝四」（出現取勝點）的著手", () => {
+  var b = G.emptyBoard(15);
+  b[7][7] = G.WHITE; b[7][8] = G.WHITE; b[7][9] = G.WHITE; b[7][6] = G.BLACK;  // 白三、左端被擋 → [7,10] 為單衝四
+  var fm = G.fourMoves(b, G.WHITE, 5, "renju");
+  assert.deepEqual(fm, [[7, 10]], "唯一衝四點為 [7,10]");
+});
+
+test("vcf 找不到連四殺時回 null；找到時回傳第一手", () => {
+  var none = G.emptyBoard(15); none[7][7] = G.WHITE; none[7][8] = G.WHITE;      // 單純雙子，無連四殺
+  assert.equal(G.vcf(none, G.WHITE, G.BLACK, 5, "renju"), null);
+
+  // 白橫向三 [7,7][7,8][7,9]（左 [7,6] 被黑擋）→ [7,10] 衝四逼黑回擋 [7,11]；
+  // 落子後白縱向 [7,10][8,10][9,10] 成三，再 [10,10] 成活四（雙取勝點）必勝。
+  var b = G.emptyBoard(15);
+  b[7][7] = G.WHITE; b[7][8] = G.WHITE; b[7][9] = G.WHITE; b[7][6] = G.BLACK;
+  b[8][10] = G.WHITE; b[9][10] = G.WHITE;
+  b[0][0] = G.BLACK;
+  assert.deepEqual(G.vcf(b, G.WHITE, G.BLACK, 5, "renju"), [7, 10]);
+});
+
+test("chooseMove 困難：VCF 連續衝四殺——能找到多手後的強制勝", () => {
+  var b = G.emptyBoard(15);
+  b[7][7] = G.WHITE; b[7][8] = G.WHITE; b[7][9] = G.WHITE; b[7][6] = G.BLACK;
+  b[8][10] = G.WHITE; b[9][10] = G.WHITE;
+  b[0][0] = G.BLACK;
+  var m = G.chooseMove(b, G.WHITE, G.BLACK, 5, "hard");
+  assert.deepEqual(m, [7, 10], "應下出 VCF 第一手 [7,10]（單衝四，逼對手回擋後成活四）");
+  // 逐步驗證：白下 [7,10] → 黑被迫回擋 [7,11] → 白 [10,10] 成活四（雙取勝點）
+  var s = G.cloneBoard(b); s[m[0]][m[1]] = G.WHITE;
+  var blk = G.findWinningMove(s, G.WHITE, 5, "renju");
+  assert.deepEqual(blk, [7, 11], "黑唯一防禦為回擋 [7,11]");
+  s[blk[0]][blk[1]] = G.BLACK;
+  var m2 = G.chooseMove(s, G.WHITE, G.BLACK, 5, "hard");
+  s[m2[0]][m2[1]] = G.WHITE;
+  assert.ok(G.winningMoveCount(s, G.WHITE, 5, "renju") >= 2, "第二手後白成活四，黑擋不勝擋");
+});
+
+test("chooseMove 困難：察覺對手 VCF 並破壞之", () => {
+  var mk = function () {
+    var b = G.emptyBoard(15);
+    b[7][7] = G.BLACK; b[7][8] = G.BLACK; b[7][9] = G.BLACK; b[7][6] = G.WHITE;  // 黑三、左端被白擋 → 黑有 [7,10] 衝四
+    b[8][10] = G.BLACK; b[9][10] = G.BLACK;                                       // 黑縱向二，配合 [7,10] 可成活四
+    b[0][0] = G.WHITE;
+    return b;
+  };
+  assert.ok(G.vcf(mk(), G.BLACK, G.WHITE, 5, "renju"), "對手（黑）確有連續衝四殺");
+  var m = G.chooseMove(mk(), G.WHITE, G.BLACK, 5, "hard");
+  var after = G.cloneBoard(mk()); after[m[0]][m[1]] = G.WHITE;
+  assert.equal(after[m[0]][m[1]], G.WHITE, "確實落子");
+  assert.equal(G.findWinningMove(after, G.BLACK, 5, "renju"), null, "落子後黑方無立即成五");
+  assert.equal(G.vcf(after, G.BLACK, G.WHITE, 5, "renju"), null, "落子後黑方 VCF 被破壞");
+});
+
+test("vcf 安全性：對手已有立即成五時，該衝四不計為致勝（回 null）", () => {
+  // 白有 [7,10] 衝四，但黑另有四連 [3,3][3,4][3,5][3,6] 可立即 [3,7] 成五 → 白連四殺被反先
+  var b = G.emptyBoard(15);
+  b[7][7] = G.WHITE; b[7][8] = G.WHITE; b[7][9] = G.WHITE; b[7][6] = G.BLACK;
+  b[3][3] = G.BLACK; b[3][4] = G.BLACK; b[3][5] = G.BLACK; b[3][6] = G.BLACK;  // 黑立即成五點 [3,7]／[3,2]
+  assert.equal(G.vcf(b, G.WHITE, G.BLACK, 5, "renju"), null, "對手可反先成五 → 白無連四殺");
+});
+
+test("vcf 深度 0（無立即成五）回 null", () => {
+  var b = G.emptyBoard(15); b[7][7] = G.WHITE; b[7][8] = G.WHITE;  // 雙子，無成五
+  assert.equal(G.vcf(b, G.WHITE, G.BLACK, 5, "renju", 0), null);
+});
+
+// ------------------------------------------------------------
 // createGame：控制器
 // ------------------------------------------------------------
 test("createGame 選項與預設", () => {
