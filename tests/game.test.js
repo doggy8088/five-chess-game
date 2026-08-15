@@ -673,7 +673,7 @@ test("place 黑棋四四：首犯退回、再犯判負", () => {
   assert.ok(g.isOver());
 });
 
-test("place 白棋長連不判負也不勝（簡單／中等模式，僅精準五連為勝）", () => {
+test("place 白棋長連不判負也不勝（中等模式，僅精準五連為勝）", () => {
   var g = G.createGame({ vsAI: false, difficulty: "medium" });
   g.place(0, 0, G.BLACK); g.place(7, 7, G.WHITE);
   g.place(0, 5, G.BLACK); g.place(7, 8, G.WHITE);
@@ -715,13 +715,72 @@ test("place 白棋長連在困難（連珠）模式下算勝", () => {
   assert.ok(Array.isArray(g.winLine) && g.winLine.length === 5, "勝利連線為 5 格");
 });
 
-test("findWinningMove：連珠模式下白棋長連為殺著，非連珠則否", () => {
+test("findWinningMove：連珠／自由模式下白棋長連為殺著，標準則否", () => {
   // 白棋 3 連 + 2 連（隔一格），(7,10) 成 6 連
   var b = G.emptyBoard(15);
   b[7][7] = G.WHITE; b[7][8] = G.WHITE; b[7][9] = G.WHITE;
   b[7][11] = G.WHITE; b[7][12] = G.WHITE;
-  var m = G.findWinningMove(b, G.WHITE, 5, true);   // 連珠：白棋長連算勝
+  var m = G.findWinningMove(b, G.WHITE, 5, "renju");      // 連珠：白棋長連算勝
   assert.ok(m && m[0] === 7 && m[1] === 10, "連珠模式下白棋找到長連殺著 (7,10)");
-  var m2 = G.findWinningMove(b, G.WHITE, 5, false); // 非連珠：僅精準五連為勝
-  assert.equal(m2, null, "非連珠模式下白棋長連不為殺著");
+  var mf = G.findWinningMove(b, G.WHITE, 5, "freestyle"); // 自由：白棋長連算勝
+  assert.ok(mf && mf[0] === 7 && mf[1] === 10, "自由模式下白棋找到長連殺著 (7,10)");
+  var m2 = G.findWinningMove(b, G.WHITE, 5, "standard"); // 標準：僅精準五連為勝
+  assert.equal(m2, null, "標準模式下白棋長連不為殺著");
+});
+
+test("findWinningMove：自由模式下黑棋長連為殺著，連珠／標準則否", () => {
+  var b = G.emptyBoard(15);
+  b[7][7] = G.BLACK; b[7][8] = G.BLACK; b[7][9] = G.BLACK;
+  b[7][11] = G.BLACK; b[7][12] = G.BLACK;
+  var m = G.findWinningMove(b, G.BLACK, 5, "freestyle");  // 自由：黑棋長連算勝
+  assert.ok(m && m[0] === 7 && m[1] === 10, "自由模式下黑棋找到長連殺著 (7,10)");
+  assert.equal(G.findWinningMove(b, G.BLACK, 5, "renju"), null, "連珠模式下黑棋長連不為殺著");
+  assert.equal(G.findWinningMove(b, G.BLACK, 5, "standard"), null, "標準模式下黑棋長連不為殺著");
+});
+
+test("place 自由規則（簡單）：黑白長連皆算勝、黑棋無禁手", () => {
+  // 黑棋長連算勝（非禁手）
+  var g = G.createGame({ vsAI: false, difficulty: "easy" });
+  g.place(7, 7, G.BLACK); g.place(0, 0, G.WHITE);
+  g.place(7, 8, G.BLACK); g.place(0, 5, G.WHITE);
+  g.place(7, 9, G.BLACK); g.place(1, 2, G.WHITE);
+  g.place(7, 11, G.BLACK); g.place(2, 9, G.WHITE);
+  g.place(7, 12, G.BLACK); g.place(3, 4, G.WHITE);
+  var r = g.place(7, 10, G.BLACK);                // 6 連
+  assert.equal(r, true, "黑棋長連可下");
+  assert.equal(g.winner, G.BLACK, "自由規則下黑棋長連算勝");
+  assert.equal(g.forbidden, false, "自由規則黑棋無禁手");
+  assert.ok(g.isOver());
+
+  // 白棋長連也算勝
+  var g2 = G.createGame({ vsAI: false, difficulty: "easy" });
+  g2.place(0, 0, G.BLACK); g2.place(7, 7, G.WHITE);
+  g2.place(0, 5, G.BLACK); g2.place(7, 8, G.WHITE);
+  g2.place(1, 2, G.BLACK); g2.place(7, 9, G.WHITE);
+  g2.place(2, 9, G.BLACK); g2.place(7, 11, G.WHITE);
+  g2.place(3, 4, G.BLACK); g2.place(7, 12, G.WHITE);
+  g2.place(6, 3, G.BLACK);                         // filler，換白棋
+  var r2 = g2.place(7, 10, G.WHITE);               // 6 連
+  assert.equal(r2, true, "白棋長連可下");
+  assert.equal(g2.winner, G.WHITE, "自由規則下白棋長連算勝");
+  assert.ok(g2.isOver());
+});
+
+test("isForbiddenMove：自由規則下黑棋長連／四四／三三皆非禁手", () => {
+  // 長連：3 連 + 2 連（隔一格），下 (7,10) 成 6 連
+  var o = G.emptyBoard(15);
+  o[7][7] = G.BLACK; o[7][8] = G.BLACK; o[7][9] = G.BLACK;
+  o[7][11] = G.BLACK; o[7][12] = G.BLACK;
+  assert.equal(G.isForbiddenMove(o, 7, 10, G.BLACK, 5, "freestyle"), false, "自由規則黑棋長連非禁手");
+  assert.equal(G.forbiddenReason(o, 7, 10, G.BLACK, 5, "freestyle"), null, "自由規則黑棋長連無禁手類型");
+  // 四四：(7,7) 同時成橫向與縱向四
+  var e = G.emptyBoard(15);
+  e[7][8] = G.BLACK; e[7][9] = G.BLACK; e[7][10] = G.BLACK;
+  e[6][7] = G.BLACK; e[5][7] = G.BLACK; e[4][7] = G.BLACK;
+  assert.equal(G.isForbiddenMove(e, 7, 7, G.BLACK, 5, "freestyle"), false, "自由規則黑棋四四非禁手");
+  // 三三：(7,7) 同時成橫向與縱向活三
+  var t = G.emptyBoard(15);
+  t[7][5] = G.BLACK; t[7][6] = G.BLACK;
+  t[5][7] = G.BLACK; t[6][7] = G.BLACK;
+  assert.equal(G.isForbiddenMove(t, 7, 7, G.BLACK, 5, "freestyle"), false, "自由規則黑棋三三非禁手");
 });

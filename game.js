@@ -82,10 +82,18 @@ function () {
     return null;
    }
 
-    // 依規則決定勝負連線：連珠（renjuRules）下白棋長連（≥min）算勝，
-    // 其餘情形（含黑棋）僅「精準五連（剛好 min）」為勝。
-  function winLineForRules(board, x, y, who, min, renjuRules) {
-    if (who === WHITE && renjuRules) return winningLine(board, x, y, who, min);
+    // 依難度對應規則集：簡單→自由（freestyle）、困難→連珠（renju）、其餘→標準（standard）。
+  function rulesetFor(difficulty) {
+    if (difficulty === "easy") return "freestyle";
+    if (difficulty === "hard") return "renju";
+    return "standard";
+   }
+    // 依規則集決定勝負連線：
+    // freestyle：黑白長連（≥min）皆算勝；renju：白棋長連算勝、黑棋僅精準五連；
+    // standard：黑白皆僅精準五連（剛好 min）。
+  function winLineForRules(board, x, y, who, min, ruleset) {
+    if (ruleset === "freestyle") return winningLine(board, x, y, who, min);
+    if (ruleset === "renju" && who === WHITE) return winningLine(board, x, y, who, min);
     return winningFiveLine(board, x, y, who, min);
    }
 
@@ -189,9 +197,10 @@ function () {
     /* ---- 禁手判定（彙整）---- */
     // 假設 board[x][y] 已為 who，回傳禁手類型；無禁手（或白棋）回 null。
     // 優先序：精準五連（勝）→ 非禁手；長連 → "overline"；四四 → "doubleFour"；三三 → "doubleThree"。
-  function forbiddenReasonPlaced(board, x, y, who, min) {
+  function forbiddenReasonPlaced(board, x, y, who, min, ruleset) {
     min = min || 5;
     if (who !== BLACK) return null;
+    if (ruleset === "freestyle") return null;                  // 自由規則：黑棋無禁手
     if (isFive(board, x, y, who, min)) return null;            // 先五為勝，不計禁手
     if (isOverline(board, x, y, who, min)) return "overline";
     if (isDoubleFour(board, x, y, who, min)) return "doubleFour";
@@ -200,20 +209,20 @@ function () {
    }
     // 在 (x,y) 落 who 子是否構成禁手（會勝不算禁手；白棋永不禁手）。
     // 函式會暫時落子再還原，呼叫時 (x,y) 需為空格。
-  function isForbiddenMove(board, x, y, who, min) {
+  function isForbiddenMove(board, x, y, who, min, ruleset) {
     if (who !== BLACK) return false;
     if (!isLegalMove(board, x, y)) return false;
     board[x][y] = who;
-    var reason = forbiddenReasonPlaced(board, x, y, who, min);
+    var reason = forbiddenReasonPlaced(board, x, y, who, min, ruleset);
     board[x][y] = EMPTY;
     return reason !== null;
    }
     // 回傳禁手類型字串（呼叫時 (x,y) 需為空格）；非禁手或白棋回 null。
-  function forbiddenReason(board, x, y, who, min) {
+  function forbiddenReason(board, x, y, who, min, ruleset) {
     if (who !== BLACK) return null;
     if (!isLegalMove(board, x, y)) return null;
     board[x][y] = who;
-    var reason = forbiddenReasonPlaced(board, x, y, who, min);
+    var reason = forbiddenReasonPlaced(board, x, y, who, min, ruleset);
     board[x][y] = EMPTY;
     return reason;
    }
@@ -268,13 +277,13 @@ function () {
     return out;
    }
 
-    // 候選格中排除黑棋雙活三禁手；白棋或全數被禁時回傳原候選（交由 place 依規則處理）。
-  function legalCandidates(board, who, min, radius) {
+    // 候選格中排除黑棋禁手；白棋、自由規則或全數被禁時回傳原候選（交由 place 依規則處理）。
+  function legalCandidates(board, who, min, radius, ruleset) {
     var cs = candidateCells(board, radius);
-    if (who !== BLACK) return cs;
+    if (who !== BLACK || ruleset === "freestyle") return cs;
     var ok = [];
     for (var i = 0; i < cs.length; i++) {
-      if (!isForbiddenMove(board, cs[i][0], cs[i][1], who, min)) ok.push(cs[i]);
+      if (!isForbiddenMove(board, cs[i][0], cs[i][1], who, min, ruleset)) ok.push(cs[i]);
       }
     return ok.length ? ok : cs;
    }
@@ -293,12 +302,12 @@ function () {
    }
 
     // 若 `who` 可立即勝出，回傳該落子點；否則 null。
-  function findWinningMove(board, who, min, renjuRules) {
+  function findWinningMove(board, who, min, ruleset) {
     var cands = candidateCells(board, 1);
     for (var i = 0; i < cands.length; i++) {
       var c = cands[i];
       board[c[0]][c[1]] = who;
-      var win = winLineForRules(board, c[0], c[1], who, min, renjuRules);
+      var win = winLineForRules(board, c[0], c[1], who, min, ruleset);
       board[c[0]][c[1]] = EMPTY;
       if (win) return [c[0], c[1]];
       }
@@ -306,8 +315,8 @@ function () {
    }
 
     // 貪婪最佳手 (jitter>0 加入隨機性，用於「簡單」等級)。
-  function greedyMove(board, ai, human, min, jitter) {
-    var cands = legalCandidates(board, ai, min, 2);
+  function greedyMove(board, ai, human, min, jitter, ruleset) {
+    var cands = legalCandidates(board, ai, min, 2, ruleset);
     if (cands.length === 0) { var c = (board.length - 1) >> 1; return [c, c]; }
     var best, bestScore = -Infinity;
     for (var i = 0; i < cands.length; i++) {
@@ -377,7 +386,7 @@ function () {
 
   // 威脅感知的 alpha-beta 搜索（困難等級用）。
   // depth 預設 3 手：本方→對方反擊→本方，足以看穿活叉與雙 threat。
-  function minimax(board, ai, human, min, depth, renjuRules) {
+  function minimax(board, ai, human, min, depth, ruleset) {
     min = min || 5;
     depth = depth || 3;
     var BUDGET = 0x100000;                         // 節點上限，避免極端局勢失控
@@ -393,7 +402,7 @@ function () {
     }
     function search(board, me, opp, d, alpha, beta) {
       if (nodes++ > BUDGET) return null;           // 節點用盡：回傳 null 由上層略過
-      var win = findWinningMove(board, me, min, renjuRules);
+      var win = findWinningMove(board, me, min, ruleset);
       if (win) return { move: win, v: 10000000 - (depth - d) }; // 越快取殺分越高
       var cands = ordered(board, me, opp);
       if (!cands) return { move: null, v: 0 };
@@ -416,37 +425,37 @@ function () {
       return { move: best, v: bv };
     }
     var result = search(board, ai, human, depth, -Infinity, Infinity);
-    if (!result) return greedyMove(board, ai, human, min, 0); // 預算用盡：退回貪婪，保證合法落點
+    if (!result) return greedyMove(board, ai, human, min, 0, ruleset); // 預算用盡：退回貪婪，保證合法落點
     return result.move;
   }
 
   function chooseMove(board, ai, human, min, difficulty) {
     difficulty = difficulty || "hard";
     min = min || 5;
-    var renjuRules = difficulty === "hard";   // 困難模式採日規／國際連珠：白棋長連算勝
+    var ruleset = rulesetFor(difficulty);   // easy→自由、hard→連珠、其餘→標準
     if (candidateCells(board, 2).length === 0) {
       var c = (board.length - 1) >> 1;
       return [c, c];
       }
-    var block = findWinningMove(board, human, min, renjuRules); // 擋对手的殺著
+    var block = findWinningMove(board, human, min, ruleset); // 擋对手的殺著
 
     if (difficulty === "easy") {
-      if (Math.random() < 0.6 && block && !isForbiddenMove(board, block[0], block[1], ai, min)) return block;
-      return greedyMove(board, ai, human, min, 1.6);
+      if (Math.random() < 0.6 && block && !isForbiddenMove(board, block[0], block[1], ai, min, ruleset)) return block;
+      return greedyMove(board, ai, human, min, 1.6, ruleset);
       }
     if (difficulty === "medium") {
-      var win = findWinningMove(board, ai, min, renjuRules);
+      var win = findWinningMove(board, ai, min, ruleset);
       if (win) return win;
-      if (block && !isForbiddenMove(board, block[0], block[1], ai, min)) return block;
-      return greedyMove(board, ai, human, min, 0);
+      if (block && !isForbiddenMove(board, block[0], block[1], ai, min, ruleset)) return block;
+      return greedyMove(board, ai, human, min, 0, ruleset);
       }
       // hard
-    var hw = findWinningMove(board, ai, min, renjuRules);
+    var hw = findWinningMove(board, ai, min, ruleset);
     if (hw) return hw;
-    if (block && !isForbiddenMove(board, block[0], block[1], ai, min)) return block;
-    var m = minimax(board, ai, human, min, 3, renjuRules);
-    if (m && ai === BLACK && isForbiddenMove(board, m[0], m[1], ai, min)) m = greedyMove(board, ai, human, min, 0);
-    return m || greedyMove(board, ai, human, min, 0);
+    if (block && !isForbiddenMove(board, block[0], block[1], ai, min, ruleset)) return block;
+    var m = minimax(board, ai, human, min, 3, ruleset);
+    if (m && ai === BLACK && isForbiddenMove(board, m[0], m[1], ai, min, ruleset)) m = greedyMove(board, ai, human, min, 0, ruleset);
+    return m || greedyMove(board, ai, human, min, 0, ruleset);
    }
 
 /* ---- 遊戲控制器 ---- */
@@ -507,19 +516,20 @@ function () {
       player = player || game.turn;
       game.board[x][y] = player;
       game.moves.push({ x: x, y: y, player: player });
-      // 先五為勝：黑棋僅「精準五連」為勝（長連為禁手）；
-      // 困難（連珠）模式下白棋長連（≥五）也算勝。
-      var renju = game.difficulty === "hard";
-      var line = winLineForRules(game.board, x, y, player, winLength, renju);
+      // 先五為勝：依難度規則集判勝——
+      // 自由（簡單）黑白長連皆勝；連珠（困難）白棋長連勝、黑棋僅精準五連；
+      // 標準（中等）黑白皆僅精準五連。黑棋禁手僅在非自由規則下適用。
+      var ruleset = rulesetFor(game.difficulty);
+      var line = winLineForRules(game.board, x, y, player, winLength, ruleset);
       if (line) {
         game.winner = player;
         game.winLine = line;
         game.turn = null;
         return true;
         }
-      // 黑棋禁手：長連／四四／三三（五連勝利優先；白棋不受限）。
+      // 黑棋禁手：長連／四四／三三（五連勝利優先；白棋不受限；自由規則無禁手）。
       if (player === BLACK) {
-        var reason = forbiddenReasonPlaced(game.board, x, y, BLACK, winLength);
+        var reason = forbiddenReasonPlaced(game.board, x, y, BLACK, winLength, ruleset);
         if (reason) {
           if (game.blackForbiddenWarned) {
             // 當局再犯 → 黑棋直接判負（保留此手以顯示犯規位置）
@@ -618,6 +628,7 @@ function () {
   Game.isDoubleFour = isDoubleFour;
   Game.winningFiveLine = winningFiveLine;
   Game.winLineForRules = winLineForRules;
+  Game.rulesetFor = rulesetFor;
   Game.forbiddenReasonPlaced = forbiddenReasonPlaced;
   Game.forbiddenReason = forbiddenReason;
   Game.isForbiddenMove = isForbiddenMove;
