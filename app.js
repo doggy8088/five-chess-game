@@ -26,7 +26,8 @@
      hint: $("hint"),
      toast: $("toast"),
      overlay: $("overlay"), ovEmoji: $("ov-emoji"), ovTitle: $("ov-title"), ovSub: $("ov-sub"),
-     overlayNew: $("ov-new"), modeLabel: $("mode-label")
+     overlayNew: $("ov-new"), modeLabel: $("mode-label"),
+     dock: $("dock"), dockClose: $("dock-close"), dockOpen: $("dock-open")
      };
 
      /* ---------------- 座標系統 (3D 與 2D 共用) ---------------- */
@@ -513,6 +514,14 @@
 
   function onPick(pos) { placeAt(pos); }
 
+  function syncDock() {
+      // 桌面版控制列永遠顯示；只在行動版允許收合
+      if (window.innerWidth > 760) {
+        els.dock.classList.remove("hidden");
+        els.dockOpen.classList.remove("show");
+      }
+    }
+
   function wireUI() {
       document.querySelectorAll(".seg [data-diff]").forEach(function (b) {
         b.addEventListener("click", function () {
@@ -542,7 +551,17 @@
         refresh();
         if (vsAI && game.currentPlayer() === game.aiPlayer && !game.isOver()) requestAI();
          });
-      window.addEventListener("resize", function () { if (view.resize) view.resize(); });
+      window.addEventListener("resize", function () { if (view.resize) view.resize(); syncDock(); });
+
+      // 行動版：收起／展開控制列
+      els.dockClose.addEventListener("click", function () {
+        els.dock.classList.add("hidden");
+        els.dockOpen.classList.add("show");
+      });
+      els.dockOpen.addEventListener("click", function () {
+        els.dock.classList.remove("hidden");
+        els.dockOpen.classList.remove("show");
+      });
        }
 
   function boot() {

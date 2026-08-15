@@ -100,6 +100,9 @@
 </aside>
 
 <div id="dock">
+   <button class="dock-close" id="dock-close" type="button" aria-label="收起控制面板" title="收起控制面板">
+     <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+   </button>
    <div class="seg" role="group" aria-label="難度">
      <button data-diff="easy" aria-pressed="false">簡單</button>
      <button data-diff="medium" aria-pressed="false">中等</button>
@@ -119,6 +122,10 @@
      <span id="mode-label">對戰 AI</span>
    </button>
 </div>
+
+<button class="dock-open" id="dock-open" type="button" aria-label="開啟控制面板" title="開啟控制面板">
+  <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+</button>
 
 <div id="hint">點擊棋盤落子 · 簡單：自由規則（長連算勝、無禁手）· 中等：標準規則（精準五連、長連不算勝、無禁手）· 困難：連珠（黑棋禁三三・四四・長連、白棋長連算勝）· 捲動縮放 · 拖曳旋轉棋盤</div>
 
