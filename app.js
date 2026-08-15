@@ -387,15 +387,19 @@
       if (!use3D) els.hint.textContent = "已切換 2D 模式（無法載入 3D 引擎）· 點擊棋盤落子";
        }
 
+  function forbiddenLabel(type) {
+      return type === "overline" ? "長連" : type === "doubleFour" ? "四四" : type === "doubleThree" ? "三三" : "禁手";
+       }
+
   function placeAt(pos) {
       if (game.isOver() || locked) return;
       var tp = game.currentPlayer();
       if (game.vsAI && tp !== game.humanPlayer) return;    // 輪到 AI
       var ok = game.place(pos.x, pos.y, tp);
       if (!ok) {
-        // 黑棋雙活三禁手：首犯已由 place() 退回，提示後請玩家重新落子。
+        // 黑棋禁手：首犯已由 place() 退回，提示後請玩家重新落子。
         if (game.forbiddenWarn) {
-          showWarning("黑棋形成「雙活三」禁手，已退回此手。\n請重新落子 — 當局再次違規將直接判負。");
+          showWarning("黑棋形成「" + forbiddenLabel(game.forbiddenWarn.type) + "」禁手，已退回此手。\n請重新落子 — 當局再次違規將直接判負。");
           game.forbiddenWarn = null;
           refresh();
           }
@@ -444,8 +448,8 @@
       var emoji = "🏆", title = "黑棋獲勝", sub = "五子連連", color = 0xffcf5a;
       if (w === G.WHITE) { title = "白棋獲勝"; emoji = "⚪"; }
       else if (w === "draw") { title = "和棋"; emoji = "🤝"; sub = "棋盤已滿"; }
-      if (game.forbidden) {                       // 黑棋因雙活三禁手判負
-        title = "黑棋禁手判負"; emoji = "🚫"; sub = "當局再次形成「雙活三」"; color = 0xff5a4d;
+      if (game.forbidden) {                       // 黑棋因禁手判負
+        title = "黑棋禁手判負"; emoji = "🚫"; sub = "當局再次形成「" + forbiddenLabel(game.forbiddenType) + "」"; color = 0xff5a4d;
         }
       if (game.winLine) view.markWin(game.winLine, color);
       els.ovEmoji.textContent = emoji;

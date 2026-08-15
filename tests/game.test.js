@@ -486,13 +486,13 @@ test("place 黑棋雙活三：首犯退回、再犯判負", () => {
   g.place(7, 6, G.BLACK); g.place(1, 2, G.WHITE);
   g.place(5, 7, G.BLACK); g.place(2, 4, G.WHITE);
   g.place(6, 7, G.BLACK); g.place(3, 6, G.WHITE);
-  assert.equal(g.blackDoubleThreeWarned, false);
+  assert.equal(g.blackForbiddenWarned, false);
   // (7,7) 同時形成橫向與縱向活三 → 雙活三，首犯退回
   var r = g.place(7, 7, G.BLACK);
   assert.equal(r, false, "首犯雙活三：此手被退回");
   assert.equal(g.board[7][7], G.EMPTY, "退回後該格為空");
   assert.equal(g.currentPlayer(), G.BLACK, "仍輪黑棋重下");
-  assert.equal(g.blackDoubleThreeWarned, true, "已記錄一次警告");
+  assert.equal(g.blackForbiddenWarned, true, "已記錄一次警告");
   assert.ok(g.forbiddenWarn, "產生禁手提示座標");
   // 黑棋改下合法手
   assert.equal(g.place(8, 8, G.BLACK), true);
@@ -551,10 +551,150 @@ test("reset / nextRound 清除雙活三警告狀態", () => {
   g.place(5, 7, G.BLACK); g.place(2, 4, G.WHITE);
   g.place(6, 7, G.BLACK); g.place(3, 6, G.WHITE);
   g.place(7, 7, G.BLACK);   // 首犯退回 → warned=true
-  assert.equal(g.blackDoubleThreeWarned, true);
+  assert.equal(g.blackForbiddenWarned, true);
   g.reset();
-  assert.equal(g.blackDoubleThreeWarned, false, "reset 清除警告");
+  assert.equal(g.blackForbiddenWarned, false, "reset 清除警告");
   assert.equal(g.forbidden, false);
   g.nextRound();
-  assert.equal(g.blackDoubleThreeWarned, false, "nextRound 清除警告");
+  assert.equal(g.blackForbiddenWarned, false, "nextRound 清除警告");
+});
+
+// ------------------------------------------------------------
+// 黑棋禁手：四四（雙四）與長連
+// 四四：同一手同時形成兩個以上的四（活四或衝四）。
+// 長連：黑棋連出六子以上（超過五子），不算勝，直接判禁手。
+// 五連勝利優先於禁手；白棋不受限（僅精準五連為勝）。
+// ------------------------------------------------------------
+test("winningFiveLine：精準五連回傳連線，長連回傳 null", () => {
+  var b = G.emptyBoard(15);
+  b[7][7] = G.BLACK; b[7][8] = G.BLACK; b[7][9] = G.BLACK; b[7][10] = G.BLACK; b[7][11] = G.BLACK;
+  var line = G.winningFiveLine(b, 7, 9, G.BLACK, 5);
+  assert.ok(line && line.length === 5, "5 連回傳 5 格");
+  var c = G.emptyBoard(15);
+  for (var y = 7; y <= 12; y++) c[7][y] = G.BLACK;
+  assert.equal(G.winningFiveLine(c, 7, 9, G.BLACK, 5), null, "6 連非精準五連 → null");
+});
+
+test("isFive / isOverline 偵測精準五連與長連", () => {
+  var b = G.emptyBoard(15);
+  b[7][6] = G.BLACK; b[7][7] = G.BLACK; b[7][8] = G.BLACK; b[7][9] = G.BLACK; b[7][10] = G.BLACK;
+  assert.equal(G.isFive(b, 7, 7, G.BLACK, 5), true, "剛好 5 連為精準五連");
+  assert.equal(G.isOverline(b, 7, 7, G.BLACK, 5), false, "5 連非長連");
+  var c = G.emptyBoard(15);
+  for (var y = 5; y <= 10; y++) c[7][y] = G.BLACK;
+  assert.equal(G.isFive(c, 7, 7, G.BLACK, 5), false, "6 連非精準五連");
+  assert.equal(G.isOverline(c, 7, 7, G.BLACK, 5), true, "6 連為長連");
+  var d = G.emptyBoard(15);
+  d[7][7] = G.BLACK; d[7][8] = G.BLACK; d[7][9] = G.BLACK; d[7][10] = G.BLACK;
+  assert.equal(G.isFive(d, 7, 7, G.BLACK, 5), false);
+  assert.equal(G.isOverline(d, 7, 7, G.BLACK, 5), false);
+});
+
+test("isFourThrough / isDoubleFour 偵測四與雙四", () => {
+  // 橫向活四：(7,7..7,10) 4 連，兩端空
+  var b = G.emptyBoard(15);
+  b[7][7] = G.BLACK; b[7][8] = G.BLACK; b[7][9] = G.BLACK; b[7][10] = G.BLACK;
+  assert.equal(G.isFourThrough(b, 7, 7, G.BLACK, 0, 1, 5), true, "橫向活四為四");
+  assert.equal(G.isDoubleFour(b, 7, 7, G.BLACK, 5), false, "單四非雙四");
+  // 單四（3 連下成 4）非禁手
+  var s = G.emptyBoard(15); s[7][8] = G.BLACK; s[7][9] = G.BLACK; s[7][10] = G.BLACK;
+  assert.equal(G.isForbiddenMove(s, 7, 7, G.BLACK, 5), false, "單四非禁手");
+  // (7,7) 空格，落子後同時成橫向與縱向四 → 雙四禁手
+  var e = G.emptyBoard(15);
+  e[7][8] = G.BLACK; e[7][9] = G.BLACK; e[7][10] = G.BLACK;   // 橫向 3（(7,7) 補成 4 連）
+  e[6][7] = G.BLACK; e[5][7] = G.BLACK; e[4][7] = G.BLACK;    // 縱向 3（(7,7) 補成 4 連）
+  assert.equal(G.forbiddenReason(e, 7, 7, G.BLACK, 5), "doubleFour", "(7,7) 成雙四禁手");
+  assert.equal(G.isForbiddenMove(e, 7, 7, G.BLACK, 5), true, "雙四為禁手");
+});
+
+test("isForbiddenMove：黑棋長連為禁手，白棋長連不受限", () => {
+  // 黑棋 3 連 + 2 連（隔一格），下 (7,10) 成 6 連
+  var b = G.emptyBoard(15);
+  b[7][7] = G.BLACK; b[7][8] = G.BLACK; b[7][9] = G.BLACK;
+  b[7][11] = G.BLACK; b[7][12] = G.BLACK;
+  b[7][10] = G.BLACK;                                       // 暫時落子驗證
+  assert.equal(G.isOverline(b, 7, 10, G.BLACK, 5), true, "落子後成 6 連長連");
+  assert.equal(G.isFive(b, 7, 10, G.BLACK, 5), false, "6 連非精準五連");
+  b[7][10] = G.EMPTY;                                       // 還原
+  assert.equal(G.isForbiddenMove(b, 7, 10, G.BLACK, 5), true, "黑棋長連為禁手");
+  assert.equal(G.forbiddenReason(b, 7, 10, G.BLACK, 5), "overline", "禁手類型為長連");
+  assert.equal(G.isForbiddenMove(b, 7, 10, G.WHITE, 5), false, "白棋長連非禁手");
+});
+
+test("place 黑棋長連：首犯退回、再犯判負", () => {
+  var g = G.createGame({ vsAI: false });
+  g.place(7, 7, G.BLACK); g.place(0, 0, G.WHITE);
+  g.place(7, 8, G.BLACK); g.place(0, 5, G.WHITE);
+  g.place(7, 9, G.BLACK); g.place(1, 2, G.WHITE);
+  g.place(7, 11, G.BLACK); g.place(2, 9, G.WHITE);
+  g.place(7, 12, G.BLACK); g.place(3, 4, G.WHITE);
+  // (7,10) → 6 連 → 長連禁手，首犯退回
+  var r = g.place(7, 10, G.BLACK);
+  assert.equal(r, false, "首犯長連：此手被退回");
+  assert.equal(g.board[7][10], G.EMPTY, "退回後該格為空");
+  assert.equal(g.blackForbiddenWarned, true, "已記錄一次警告");
+  assert.equal(g.forbiddenWarn.type, "overline", "禁手類型為長連");
+  // 黑棋改下合法手
+  assert.equal(g.place(8, 8, G.BLACK), true);
+  g.place(6, 3, G.WHITE);
+  // 再犯長連 → 黑棋判負
+  var r3 = g.place(7, 10, G.BLACK);
+  assert.equal(r3, true, "再犯：棋局結束回 true");
+  assert.equal(g.winner, G.WHITE, "黑棋判負，白棋勝");
+  assert.equal(g.forbidden, true);
+  assert.equal(g.forbiddenType, "overline", "判負禁手類型為長連");
+  assert.equal(g.board[7][10], G.BLACK, "再犯之手保留以顯示犯規位置");
+  assert.ok(g.isOver());
+});
+
+test("place 黑棋四四：首犯退回、再犯判負", () => {
+  var g = G.createGame({ vsAI: false });
+  g.place(7, 8, G.BLACK); g.place(0, 0, G.WHITE);
+  g.place(7, 9, G.BLACK); g.place(0, 5, G.WHITE);
+  g.place(7, 10, G.BLACK); g.place(1, 2, G.WHITE);
+  g.place(6, 7, G.BLACK); g.place(2, 9, G.WHITE);
+  g.place(5, 7, G.BLACK); g.place(3, 4, G.WHITE);
+  g.place(4, 7, G.BLACK); g.place(5, 5, G.WHITE);
+  // (7,7) 同時成橫向與縱向四 → 四四禁手，首犯退回
+  var r = g.place(7, 7, G.BLACK);
+  assert.equal(r, false, "首犯四四：此手被退回");
+  assert.equal(g.board[7][7], G.EMPTY, "退回後該格為空");
+  assert.equal(g.blackForbiddenWarned, true, "已記錄一次警告");
+  assert.equal(g.forbiddenWarn.type, "doubleFour", "禁手類型為四四");
+  // 黑棋改下合法手
+  assert.equal(g.place(8, 8, G.BLACK), true);
+  g.place(6, 3, G.WHITE);
+  // 再犯四四 → 黑棋判負
+  var r3 = g.place(7, 7, G.BLACK);
+  assert.equal(r3, true, "再犯：棋局結束回 true");
+  assert.equal(g.winner, G.WHITE, "黑棋判負，白棋勝");
+  assert.equal(g.forbidden, true);
+  assert.equal(g.forbiddenType, "doubleFour", "判負禁手類型為四四");
+  assert.ok(g.isOver());
+});
+
+test("place 白棋長連不判負也不勝（白棋無禁手，僅精準五連為勝）", () => {
+  var g = G.createGame({ vsAI: false });
+  g.place(0, 0, G.BLACK); g.place(7, 7, G.WHITE);
+  g.place(0, 5, G.BLACK); g.place(7, 8, G.WHITE);
+  g.place(1, 2, G.BLACK); g.place(7, 9, G.WHITE);
+  g.place(2, 9, G.BLACK); g.place(7, 11, G.WHITE);
+  g.place(3, 4, G.BLACK); g.place(7, 12, G.WHITE);
+  g.place(6, 3, G.BLACK);   // filler，換白棋
+  // 白棋 (7,10) → 6 連（長連）：白棋無禁手，且僅精準五連為勝 → 不勝也不判負
+  var r = g.place(7, 10, G.WHITE);
+  assert.equal(r, true, "白棋長連可下（不判負）");
+  assert.equal(g.winner, null, "白棋長連不勝（僅精準五連為勝）");
+  assert.equal(g.board[7][10], G.WHITE, "白棋已落子");
+  assert.equal(g.currentPlayer(), G.BLACK, "換黑棋");
+});
+
+test("chooseMove 黑棋會避開長連禁手", () => {
+  var b = G.emptyBoard(15);
+  b[7][7] = G.BLACK; b[7][8] = G.BLACK; b[7][9] = G.BLACK;
+  b[7][11] = G.BLACK; b[7][12] = G.BLACK;
+  // (7,10) 會成 6 連（長連禁手）；chooseMove（黑）不應選它
+  var m = G.chooseMove(b, G.BLACK, G.WHITE, 5, "hard");
+  assert.ok(!(m[0] === 7 && m[1] === 10), "不選長連禁手 (7,10)");
+  assert.equal(G.isForbiddenMove(b, m[0], m[1], G.BLACK, 5), false, "所選非禁手");
 });

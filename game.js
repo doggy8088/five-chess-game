@@ -64,10 +64,29 @@ function () {
     return null;
    }
 
-    /* ---- 黑棋禁手：雙活三（三三）偵測 ----
-     * 活三：再加一手即可在該方向形成「活四」（連續四子、兩端皆空）的開放三。
-     * 雙活三：同一手棋同時形成兩個以上的活三。先手黑棋禁手。
-     * 五連勝利優先於禁手（會勝即不視為禁手）；白棋不受限。
+    // 若於 (x,y) 落子形成「精準五連」（某方向剛好 min 子），回傳該連線；否則 null。
+    // 黑棋長連（>min）不算勝，故採「剛好等於 min」而非 ≥。
+  function winningFiveLine(board, x, y, who, min) {
+    var size = board.length, min = min || 5;
+    for (var d = 0; d < DIRS.length; d++) {
+      var dx = DIRS[d][0], dy = DIRS[d][1];
+      if (countLine(board, x, y, who, dx, dy) === min) {
+        var cells = [[x, y]];
+        var nx = x + dx, ny = y + dy;
+        while (inBounds(size, nx, ny) && board[nx][ny] === who) { cells.push([nx, ny]); nx += dx; ny += dy; }
+        nx = x - dx; ny = y - dy;
+        while (inBounds(size, nx, ny) && board[nx][ny] === who) { cells.unshift([nx, ny]); nx -= dx; ny -= dy; }
+        return cells.slice(0, min);
+        }
+      }
+    return null;
+   }
+
+    /* ---- 黑棋禁手：三三・四四・長連 偵測 ----
+     * 三三（雙活三）：同一手同時形成兩個以上的活三。
+     * 四四（雙四）：同一手同時形成兩個以上的四（活四或衝四）。
+     * 長連：黑棋連出六子以上（超過五子），不算勝，直接判禁手。
+     * 先五為勝：精準五連優先於禁手（會勝即不視為禁手）；白棋不受限。
      */
   // 在方向 (dx,dy) 上，是否存在一段「活四」（連續四子、兩端皆空）穿越 (x,y)。
   // 呼叫前 board[x][y] 需已為 who。
@@ -109,17 +128,87 @@ function () {
     return count >= 2;
    }
 
-    // 在 (x,y) 落 who 子是否構成雙活三禁手（會勝不算禁手；白棋永不禁手）。
+    /* ---- 長連與精準五連 ---- */
+    // (x,y) 落子後是否形成「精準五連」（某方向剛好 min 子）。呼叫前 board[x][y] 需已為 who。
+  function isFive(board, x, y, who, min) {
+    min = min || 5;
+    for (var d = 0; d < DIRS.length; d++) {
+      if (countLine(board, x, y, who, DIRS[d][0], DIRS[d][1]) === min) return true;
+      }
+    return false;
+   }
+    // (x,y) 落子後是否形成「長連」（某方向超過 min 子）。呼叫前 board[x][y] 需已為 who。
+  function isOverline(board, x, y, who, min) {
+    min = min || 5;
+    for (var d = 0; d < DIRS.length; d++) {
+      if (countLine(board, x, y, who, DIRS[d][0], DIRS[d][1]) > min) return true;
+      }
+    return false;
+   }
+
+    /* ---- 四四（雙四）偵測 ----
+     * 「四」：再加一手即可成「精準五連」的連子型（含活四與衝四）；
+     *        只能湊成長連（六子以上）的「假四」不算。
+     * 四四：同一手同時形成兩個以上的四。先手黑棋禁手。
+     */
+    // 方向 (dx,dy) 上穿過 (x,y) 的連子數是否剛好 min。呼叫前 board[x][y] 需已為 who。
+  function isFiveThrough(board, x, y, who, dx, dy, min) {
+    return countLine(board, x, y, who, dx, dy) === (min || 5);
+   }
+    // 在方向 (dx,dy) 上，(x,y) 落子後是否形成「四」（再加一手可成精準五連）。
+    // 呼叫前 board[x][y] 需已為 who。
+  function isFourThrough(board, x, y, who, dx, dy, min) {
+    var size = board.length;
+    for (var k = -4; k <= 4; k++) {
+      if (k === 0) continue;
+      var ex = x + dx * k, ey = y + dy * k;
+      if (!inBounds(size, ex, ey) || board[ex][ey] !== EMPTY) continue;
+      board[ex][ey] = who;
+      var hit = isFiveThrough(board, x, y, who, dx, dy, min);
+      board[ex][ey] = EMPTY;
+      if (hit) return true;
+      }
+    return false;
+   }
+    // (x,y) 落子後是否同時形成兩個以上的四。呼叫前 board[x][y] 需已為 who。
+  function isDoubleFour(board, x, y, who, min) {
+    var count = 0;
+    for (var d = 0; d < DIRS.length; d++) {
+      if (isFourThrough(board, x, y, who, DIRS[d][0], DIRS[d][1], min)) count++;
+      }
+    return count >= 2;
+   }
+
+    /* ---- 禁手判定（彙整）---- */
+    // 假設 board[x][y] 已為 who，回傳禁手類型；無禁手（或白棋）回 null。
+    // 優先序：精準五連（勝）→ 非禁手；長連 → "overline"；四四 → "doubleFour"；三三 → "doubleThree"。
+  function forbiddenReasonPlaced(board, x, y, who, min) {
+    min = min || 5;
+    if (who !== BLACK) return null;
+    if (isFive(board, x, y, who, min)) return null;            // 先五為勝，不計禁手
+    if (isOverline(board, x, y, who, min)) return "overline";
+    if (isDoubleFour(board, x, y, who, min)) return "doubleFour";
+    if (isDoubleOpenThree(board, x, y, who)) return "doubleThree";
+    return null;
+   }
+    // 在 (x,y) 落 who 子是否構成禁手（會勝不算禁手；白棋永不禁手）。
     // 函式會暫時落子再還原，呼叫時 (x,y) 需為空格。
   function isForbiddenMove(board, x, y, who, min) {
-    min = min || 5;
     if (who !== BLACK) return false;
     if (!isLegalMove(board, x, y)) return false;
     board[x][y] = who;
-    var win = winningLine(board, x, y, who, min);
-    var forbidden = !win && isDoubleOpenThree(board, x, y, who);
+    var reason = forbiddenReasonPlaced(board, x, y, who, min);
     board[x][y] = EMPTY;
-    return forbidden;
+    return reason !== null;
+   }
+    // 回傳禁手類型字串（呼叫時 (x,y) 需為空格）；非禁手或白棋回 null。
+  function forbiddenReason(board, x, y, who, min) {
+    if (who !== BLACK) return null;
+    if (!isLegalMove(board, x, y)) return null;
+    board[x][y] = who;
+    var reason = forbiddenReasonPlaced(board, x, y, who, min);
+    board[x][y] = EMPTY;
+    return reason;
    }
 
   function patternScore(count, openEnds) {
@@ -202,7 +291,7 @@ function () {
     for (var i = 0; i < cands.length; i++) {
       var c = cands[i];
       board[c[0]][c[1]] = who;
-      var win = winningLine(board, c[0], c[1], who, min);
+      var win = winningFiveLine(board, c[0], c[1], who, min);
       board[c[0]][c[1]] = EMPTY;
       if (win) return [c[0], c[1]];
       }
@@ -375,9 +464,10 @@ function () {
       winLine: null,
       turn: BLACK,
       aiThinking: false,
-      blackDoubleThreeWarned: false, // 黑棋已因雙活三被警告過（當局再犯判負）
-      forbidden: false,              // 當局是否因黑棋禁手判負
-      forbiddenWarn: null            // 雙活三首犯退回的提示座標 {x,y}（供 UI 顯示）
+      blackForbiddenWarned: false, // 黑棋已因禁手被警告過（當局再犯判負）
+      forbidden: false,            // 當局是否因黑棋禁手判負
+      forbiddenType: null,         // 禁手類型："overline"|"doubleFour"|"doubleThree"
+      forbiddenWarn: null          // 首犯退回的提示 {x,y,type}（供 UI 顯示）
      };
 
     function resetInternal() {
@@ -387,8 +477,9 @@ function () {
       game.winLine = null;
       game.turn = BLACK;
       game.aiThinking = false;
-      game.blackDoubleThreeWarned = false;
+      game.blackForbiddenWarned = false;
       game.forbidden = false;
+      game.forbiddenType = null;
       game.forbiddenWarn = null;
       }
 
@@ -408,29 +499,34 @@ function () {
       player = player || game.turn;
       game.board[x][y] = player;
       game.moves.push({ x: x, y: y, player: player });
-      var line = winningLine(game.board, x, y, player, winLength);
+      // 先五為勝：黑白皆以「精準五連」為勝（黑棋長連不算勝，為禁手）。
+      var line = winningFiveLine(game.board, x, y, player, winLength);
       if (line) {
         game.winner = player;
         game.winLine = line;
         game.turn = null;
         return true;
         }
-      // 黑棋禁手：雙活三。先手黑棋不得同時形成兩個活三。
-      if (player === BLACK && isDoubleOpenThree(game.board, x, y, BLACK)) {
-        if (game.blackDoubleThreeWarned) {
-          // 當局再犯 → 黑棋直接判負（保留此手以顯示犯規位置）
-          game.winner = opponentOf(BLACK);
-          game.winLine = null;
-          game.forbidden = true;
-          game.turn = null;
-          return true;
+      // 黑棋禁手：長連／四四／三三（五連勝利優先；白棋不受限）。
+      if (player === BLACK) {
+        var reason = forbiddenReasonPlaced(game.board, x, y, BLACK, winLength);
+        if (reason) {
+          if (game.blackForbiddenWarned) {
+            // 當局再犯 → 黑棋直接判負（保留此手以顯示犯規位置）
+            game.winner = opponentOf(BLACK);
+            game.winLine = null;
+            game.forbidden = true;
+            game.forbiddenType = reason;
+            game.turn = null;
+            return true;
+            }
+          // 首犯 → 給予一次退回機會：撤銷此手，警告後重下
+          game.board[x][y] = EMPTY;
+          game.moves.pop();
+          game.blackForbiddenWarned = true;
+          game.forbiddenWarn = { x: x, y: y, type: reason };
+          return false;
           }
-        // 首犯 → 給予一次退回機會：撤銷此手，警告後重下
-        game.board[x][y] = EMPTY;
-        game.moves.pop();
-        game.blackDoubleThreeWarned = true;
-        game.forbiddenWarn = { x: x, y: y };
-        return false;
         }
       if (game.moves.length === size * size) {
         game.winner = "draw";
@@ -448,7 +544,7 @@ function () {
       if (!m || !isLegalMove(game.board, m[0], m[1])) { game.aiThinking = false; return null; }
       var ok = game.place(m[0], m[1], game.aiPlayer);
       if (!ok) {
-        // 落子被退回（黑棋雙活三首犯）：清掉 UI 提示並重選避開禁手的一手。
+        // 落子被退回（黑棋禁手首犯）：清掉 UI 提示並重選避開禁手的一手。
         if (game.forbiddenWarn) game.forbiddenWarn = null;
         m = chooseMove(game.board, game.aiPlayer, game.humanPlayer, winLength, game.difficulty);
         if (m && isLegalMove(game.board, m[0], m[1])) ok = game.place(m[0], m[1], game.aiPlayer);
@@ -472,6 +568,7 @@ function () {
       game.winner = null;
       game.winLine = null;
       game.forbidden = false;
+      game.forbiddenType = null;
       game.forbiddenWarn = null;
       game.aiThinking = false;
       game.turn = game.moves.length === 0 ? BLACK : opponentOf(game.moves[game.moves.length - 1].player);
@@ -485,8 +582,9 @@ function () {
         winLine: game.winLine,
         moves: game.moves.map(function (m) { return { x: m.x, y: m.y, player: m.player }; }),
         turn: game.turn,
-        blackDoubleThreeWarned: game.blackDoubleThreeWarned,
-        forbidden: game.forbidden
+        blackForbiddenWarned: game.blackForbiddenWarned,
+        forbidden: game.forbidden,
+        forbiddenType: game.forbiddenType
         };
      };
 
@@ -503,6 +601,14 @@ function () {
   Game.isOpenFourThrough = isOpenFourThrough;
   Game.isOpenThree = isOpenThree;
   Game.isDoubleOpenThree = isDoubleOpenThree;
+  Game.isFive = isFive;
+  Game.isOverline = isOverline;
+  Game.isFiveThrough = isFiveThrough;
+  Game.isFourThrough = isFourThrough;
+  Game.isDoubleFour = isDoubleFour;
+  Game.winningFiveLine = winningFiveLine;
+  Game.forbiddenReasonPlaced = forbiddenReasonPlaced;
+  Game.forbiddenReason = forbiddenReason;
   Game.isForbiddenMove = isForbiddenMove;
   Game.patternScore = patternScore;
   Game.evaluateCell = evaluateCell;
