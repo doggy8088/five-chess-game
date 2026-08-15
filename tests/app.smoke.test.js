@@ -46,7 +46,7 @@ function installDom(innerW, innerH) {
     return registry[id];
     }
   var diffButtons = [makeEl(), makeEl(), makeEl()];
-  diffButtons.forEach((b) => { b.setAttribute("data-diff", "easy"); b.setAttribute("aria-pressed", "false"); });
+  diffButtons.forEach((b, i) => { b.setAttribute("data-diff", ["easy", "medium", "hard"][i]); b.setAttribute("aria-pressed", "false"); });
 
   global.window = {
     Game: require("../game.js"),
@@ -81,6 +81,10 @@ function coords(gx, gy, innerW, innerH) {
   return { x: pad + gx * cell, y: pad + gy * cell };
 }
 function click(view, gx, gy, W, H) { var c = coords(gx, gy, W, H); view.dispatch("pointerdown", { clientX: c.x, clientY: c.y, buttons: 0 }); }
+function setDiff(d) {
+  var btn = DOM.querySelectorAll(".seg [data-diff]").find((b) => b.getAttribute("data-diff") === d);
+  btn.dispatch("click");
+}
 
 const W = 800, H = 800;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -121,6 +125,7 @@ test("app 第二手黑棋 → AI 再回應，子數 +2", async () => {
 });
 
 test("app undo：撤銷最後黑白各一手", async () => {
+  setDiff("easy");              // 簡單：撤銷無次數限制
   click(FB, 3, 3, W, H);        // 第 3 黑
   await sleep(330);             // AI 第 3 白
   assert.equal(stones.textContent, "6 / 225");
@@ -128,7 +133,49 @@ test("app undo：撤銷最後黑白各一手", async () => {
   assert.equal(stones.textContent, "4 / 225", "撤兩手回到 4 子");
 });
 
+test("app 撤銷限制：中等最多 1 次、困難禁用、簡單無限制", async () => {
+  var undoBtn = DOM.getElementById("btn-undo");
+
+  // 困難：禁用撤銷
+  setDiff("hard");
+  DOM.getElementById("btn-new").dispatch("click");
+  click(FB, 7, 7, W, H);
+  await sleep(330);
+  assert.equal(stones.textContent, "2 / 225");
+  assert.equal(undoBtn.disabled, true, "困難模式撤銷按鈕禁用");
+  undoBtn.dispatch("click");
+  assert.equal(stones.textContent, "2 / 225", "困難模式點擊撤銷無效");
+
+  // 中等：最多 1 次
+  setDiff("medium");
+  DOM.getElementById("btn-new").dispatch("click");
+  click(FB, 7, 7, W, H);
+  await sleep(330);
+  assert.equal(stones.textContent, "2 / 225");
+  assert.equal(undoBtn.disabled, false, "中等模式首次撤銷可用");
+  undoBtn.dispatch("click");
+  assert.equal(stones.textContent, "0 / 225", "中等模式撤銷成功");
+  assert.equal(undoBtn.disabled, true, "中等模式用過 1 次後禁用");
+  undoBtn.dispatch("click");
+  assert.equal(stones.textContent, "0 / 225", "中等模式第二次撤銷無效");
+
+  // 簡單：無次數限制
+  setDiff("easy");
+  DOM.getElementById("btn-new").dispatch("click");
+  click(FB, 7, 7, W, H);
+  await sleep(330);
+  click(FB, 8, 8, W, H);
+  await sleep(330);
+  assert.equal(stones.textContent, "4 / 225");
+  undoBtn.dispatch("click");
+  assert.equal(stones.textContent, "2 / 225", "簡單模式第一次撤銷");
+  undoBtn.dispatch("click");
+  assert.equal(stones.textContent, "0 / 225", "簡單模式第二次撤銷仍可用");
+  await sleep(330);   // 等第一次撤銷後排程的 AI 落子完成
+});
+
 test("app 切換模式：對戰 AI ↔ 雙人類", () => {
+  setDiff("hard");              // 還原難度，避免受前測影響
   DOM.getElementById("btn-mode").dispatch("click");
   assert.equal(mode.textContent, "雙人類");
   DOM.getElementById("btn-mode").dispatch("click");
@@ -175,7 +222,8 @@ test("app 統計：勝局記錄勝率與連勝，悔棋還原", async () => {
   assert.equal(streak.textContent, "1", "勝局後連勝 1");
   assert.equal(API.stats.wins, 1);
 
-  // 悔棋退回已記錄的結果
+  // 悔棋退回已記錄的結果（先切到簡單模式以允許撤銷）
+  setDiff("easy");
   DOM.getElementById("btn-undo").dispatch("click");
   assert.equal(winrate.textContent, "–", "悔棋後勝率還原");
   assert.equal(streak.textContent, "0", "悔棋後連勝還原");

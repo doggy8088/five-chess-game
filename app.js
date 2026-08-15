@@ -14,7 +14,11 @@
     var game = G.createGame({ size: SIZE, vsAI: vsAI, aiPlayer: G.WHITE, difficulty: difficulty });
 
     var locked = false;        // AI 思考中鎖定人類點擊
+    var undoUsed = 0;          // 本局已使用的撤銷次數（新局歸零）
     var view = null;
+
+  // 撤銷限制：簡單無限制、中等最多 1 次、困難禁用
+  function undoLimit() { return difficulty === "easy" ? Infinity : difficulty === "medium" ? 1 : 0; }
 
      /* ---------------- DOM 引用 ---------------- */
   function $(id) { return document.getElementById(id); }
@@ -472,6 +476,7 @@
 
   function newGame() {
       game = G.createGame({ size: SIZE, vsAI: vsAI, aiPlayer: G.WHITE, difficulty: difficulty });
+      undoUsed = 0;
       view.clearMarks();
       view.reset();
       hideOverlay();
@@ -509,7 +514,7 @@
 
   function setBusy(b) {
       $("btn-new").disabled = b;
-      $("btn-undo").disabled = b || game.moves.length === 0;
+      $("btn-undo").disabled = b || game.moves.length === 0 || undoUsed >= undoLimit();
        }
 
   function refresh() {
@@ -549,7 +554,7 @@
         else { els.sStatus.textContent = "和棋"; els.sStatus.className = "v status-draw"; }
          }
       els.sMode.textContent = game.vsAI ? "對戰 AI（" + diffName() + "）" : "雙人類";
-      $("btn-undo").disabled = locked || game.moves.length === 0;
+      $("btn-undo").disabled = locked || game.moves.length === 0 || undoUsed >= undoLimit();
        }
 
   function diffName() { return difficulty === "easy" ? "簡單" : difficulty === "medium" ? "中等" : "困難"; }
@@ -578,8 +583,10 @@
        $("btn-new").addEventListener("click", newGame);
        els.overlayNew.addEventListener("click", newGame);
        $("btn-undo").addEventListener("click", function () {
+        if (undoUsed >= undoLimit()) return;   // 已達本局撤銷上限
         var wasOver = game.isOver();
         if (!game.undo()) return;
+        undoUsed++;
         if (wasOver) revertResult();   // 悔棋退回已記錄的結果
         hideOverlay();
         rewindAll();
@@ -627,7 +634,9 @@
       refresh: refresh,
       newGame: newGame,
       undo: function () {
+        if (undoUsed >= undoLimit()) return;
         if (!game.undo()) return;
+        undoUsed++;
         hideOverlay();
         rewindAll();
         refresh();
