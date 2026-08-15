@@ -24,6 +24,7 @@
      sRound: $("s-round"), sStones: $("s-stones"), sBlack: $("s-black"), sWhite: $("s-white"),
      sBar: $("s-bar"), sStatus: $("s-status"), sMode: $("s-mode"),
      hint: $("hint"),
+     toast: $("toast"),
      overlay: $("overlay"), ovEmoji: $("ov-emoji"), ovTitle: $("ov-title"), ovSub: $("ov-sub"),
      overlayNew: $("ov-new"), modeLabel: $("mode-label")
      };
@@ -391,7 +392,15 @@
       var tp = game.currentPlayer();
       if (game.vsAI && tp !== game.humanPlayer) return;    // 輪到 AI
       var ok = game.place(pos.x, pos.y, tp);
-      if (!ok) return;
+      if (!ok) {
+        // 黑棋雙活三禁手：首犯已由 place() 退回，提示後請玩家重新落子。
+        if (game.forbiddenWarn) {
+          showWarning("黑棋形成「雙活三」禁手，已退回此手。\n請重新落子 — 當局再次違規將直接判負。");
+          game.forbiddenWarn = null;
+          refresh();
+          }
+        return;
+        }
       view.place(pos.x, pos.y, tp);
       view.markLast(pos.x, pos.y);
       refresh();
@@ -426,6 +435,7 @@
       view.clearMarks();
       view.reset();
       hideOverlay();
+      if (els.toast) els.toast.classList.remove("show");
       refresh();
        }
 
@@ -434,6 +444,9 @@
       var emoji = "🏆", title = "黑棋獲勝", sub = "五子連連", color = 0xffcf5a;
       if (w === G.WHITE) { title = "白棋獲勝"; emoji = "⚪"; }
       else if (w === "draw") { title = "和棋"; emoji = "🤝"; sub = "棋盤已滿"; }
+      if (game.forbidden) {                       // 黑棋因雙活三禁手判負
+        title = "黑棋禁手判負"; emoji = "🚫"; sub = "當局再次形成「雙活三」"; color = 0xff5a4d;
+        }
       if (game.winLine) view.markWin(game.winLine, color);
       els.ovEmoji.textContent = emoji;
       els.ovTitle.textContent = title;
@@ -443,6 +456,15 @@
        }
 
   function hideOverlay() { els.overlay.classList.remove("show"); }
+
+  var toastTimer = null;
+  function showWarning(msg) {
+      if (!els.toast) return;
+      els.toast.textContent = msg;
+      els.toast.classList.add("show");
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { els.toast.classList.remove("show"); }, 3600);
+       }
 
   function setBusy(b) {
       $("btn-new").disabled = b;

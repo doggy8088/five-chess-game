@@ -159,6 +159,17 @@ button.btn.primary{ background:linear-gradient(180deg,var(--accent),#e85f40); bo
 @keyframes fade{ from{opacity:0} to{opacity:1} }
 @keyframes rise{ to{ transform:translateY(0);} }
 
+/* ---------------- 禁手／警告提示 ---------------- */
+#toast{
+  position:absolute; z-index:9; top:50%; left:50%; transform:translate(-50%,-50%);
+  max-width:min(90vw,440px); padding:18px 24px; border-radius:14px; text-align:center;
+  background:linear-gradient(180deg, rgba(40,22,16,0.96), rgba(26,14,10,0.97));
+  border:1px solid rgba(255,122,89,0.55); box-shadow:var(--shadow);
+  color:#ffd9cc; font-size:14.5px; line-height:1.55; font-weight:600; letter-spacing:.01em;
+  display:none;
+}
+#toast.show{ display:block; animation:fade .25s ease; }
+
 @media (max-width:760px){
   #stats{ display:none; }
   #hud{ top:auto; bottom:150px; }

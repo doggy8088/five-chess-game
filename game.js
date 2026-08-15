@@ -64,6 +64,64 @@ function () {
     return null;
    }
 
+    /* ---- 黑棋禁手：雙活三（三三）偵測 ----
+     * 活三：再加一手即可在該方向形成「活四」（連續四子、兩端皆空）的開放三。
+     * 雙活三：同一手棋同時形成兩個以上的活三。先手黑棋禁手。
+     * 五連勝利優先於禁手（會勝即不視為禁手）；白棋不受限。
+     */
+  // 在方向 (dx,dy) 上，是否存在一段「活四」（連續四子、兩端皆空）穿越 (x,y)。
+  // 呼叫前 board[x][y] 需已為 who。
+  function isOpenFourThrough(board, x, y, who, dx, dy) {
+    var size = board.length;
+    var sx = x, sy = y, px = x - dx, py = y - dy;
+    while (inBounds(size, px, py) && board[px][py] === who) { sx = px; sy = py; px -= dx; py -= dy; }
+    var cnt = 0, cx = sx, cy = sy;
+    while (inBounds(size, cx, cy) && board[cx][cy] === who) { cnt++; cx += dx; cy += dy; }
+    if (cnt !== 4) return false;
+    var bx = sx - dx, by = sy - dy;           // 起點前一格
+    var openB = inBounds(size, bx, by) && board[bx][by] === EMPTY;
+    var openA = inBounds(size, cx, cy) && board[cx][cy] === EMPTY; // 終點後一格
+    return openB && openA;
+   }
+
+    // 在方向 (dx,dy) 上，(x,y) 落子後是否形成活三（再加一手可成活四）。
+    // 呼叫前 board[x][y] 需已為 who。
+  function isOpenThree(board, x, y, who, dx, dy) {
+    var size = board.length;
+    for (var k = -4; k <= 4; k++) {
+      if (k === 0) continue;
+      var ex = x + dx * k, ey = y + dy * k;
+      if (!inBounds(size, ex, ey) || board[ex][ey] !== EMPTY) continue;
+      board[ex][ey] = who;
+      var hit = isOpenFourThrough(board, x, y, who, dx, dy);
+      board[ex][ey] = EMPTY;
+      if (hit) return true;
+      }
+    return false;
+   }
+
+    // (x,y) 落子後是否同時形成兩個以上的活三。呼叫前 board[x][y] 需已為 who。
+  function isDoubleOpenThree(board, x, y, who) {
+    var count = 0;
+    for (var d = 0; d < DIRS.length; d++) {
+      if (isOpenThree(board, x, y, who, DIRS[d][0], DIRS[d][1])) count++;
+      }
+    return count >= 2;
+   }
+
+    // 在 (x,y) 落 who 子是否構成雙活三禁手（會勝不算禁手；白棋永不禁手）。
+    // 函式會暫時落子再還原，呼叫時 (x,y) 需為空格。
+  function isForbiddenMove(board, x, y, who, min) {
+    min = min || 5;
+    if (who !== BLACK) return false;
+    if (!isLegalMove(board, x, y)) return false;
+    board[x][y] = who;
+    var win = winningLine(board, x, y, who, min);
+    var forbidden = !win && isDoubleOpenThree(board, x, y, who);
+    board[x][y] = EMPTY;
+    return forbidden;
+   }
+
   function patternScore(count, openEnds) {
     if (count >= 5) return 1000000;
     if (openEnds === 0) return 0;
@@ -114,6 +172,17 @@ function () {
     return out;
    }
 
+    // 候選格中排除黑棋雙活三禁手；白棋或全數被禁時回傳原候選（交由 place 依規則處理）。
+  function legalCandidates(board, who, min, radius) {
+    var cs = candidateCells(board, radius);
+    if (who !== BLACK) return cs;
+    var ok = [];
+    for (var i = 0; i < cs.length; i++) {
+      if (!isForbiddenMove(board, cs[i][0], cs[i][1], who, min)) ok.push(cs[i]);
+      }
+    return ok.length ? ok : cs;
+   }
+
   function centerBias(x, y, size, k) {
     var c = (size - 1) / 2;
     var dist = Math.abs(x - c) + Math.abs(y - c);
@@ -142,7 +211,7 @@ function () {
 
     // 貪婪最佳手 (jitter>0 加入隨機性，用於「簡單」等級)。
   function greedyMove(board, ai, human, min, jitter) {
-    var cands = candidateCells(board, 2);
+    var cands = legalCandidates(board, ai, min, 2);
     if (cands.length === 0) { var c = (board.length - 1) >> 1; return [c, c]; }
     var best, bestScore = -Infinity;
     for (var i = 0; i < cands.length; i++) {
@@ -265,20 +334,21 @@ function () {
     var block = findWinningMove(board, human, min); // 擋对手的殺著
 
     if (difficulty === "easy") {
-      if (Math.random() < 0.6 && block) return block;
+      if (Math.random() < 0.6 && block && !isForbiddenMove(board, block[0], block[1], ai, min)) return block;
       return greedyMove(board, ai, human, min, 1.6);
       }
     if (difficulty === "medium") {
       var win = findWinningMove(board, ai, min);
       if (win) return win;
-      if (block) return block;
+      if (block && !isForbiddenMove(board, block[0], block[1], ai, min)) return block;
       return greedyMove(board, ai, human, min, 0);
       }
       // hard
     var hw = findWinningMove(board, ai, min);
     if (hw) return hw;
-    if (block) return block;
+    if (block && !isForbiddenMove(board, block[0], block[1], ai, min)) return block;
     var m = minimax(board, ai, human, min);
+    if (m && ai === BLACK && isForbiddenMove(board, m[0], m[1], ai, min)) m = greedyMove(board, ai, human, min, 0);
     return m || greedyMove(board, ai, human, min, 0);
    }
 
@@ -304,7 +374,10 @@ function () {
       winner: null,
       winLine: null,
       turn: BLACK,
-      aiThinking: false
+      aiThinking: false,
+      blackDoubleThreeWarned: false, // 黑棋已因雙活三被警告過（當局再犯判負）
+      forbidden: false,              // 當局是否因黑棋禁手判負
+      forbiddenWarn: null            // 雙活三首犯退回的提示座標 {x,y}（供 UI 顯示）
      };
 
     function resetInternal() {
@@ -314,6 +387,9 @@ function () {
       game.winLine = null;
       game.turn = BLACK;
       game.aiThinking = false;
+      game.blackDoubleThreeWarned = false;
+      game.forbidden = false;
+      game.forbiddenWarn = null;
       }
 
     resetInternal();
@@ -339,6 +415,23 @@ function () {
         game.turn = null;
         return true;
         }
+      // 黑棋禁手：雙活三。先手黑棋不得同時形成兩個活三。
+      if (player === BLACK && isDoubleOpenThree(game.board, x, y, BLACK)) {
+        if (game.blackDoubleThreeWarned) {
+          // 當局再犯 → 黑棋直接判負（保留此手以顯示犯規位置）
+          game.winner = opponentOf(BLACK);
+          game.winLine = null;
+          game.forbidden = true;
+          game.turn = null;
+          return true;
+          }
+        // 首犯 → 給予一次退回機會：撤銷此手，警告後重下
+        game.board[x][y] = EMPTY;
+        game.moves.pop();
+        game.blackDoubleThreeWarned = true;
+        game.forbiddenWarn = { x: x, y: y };
+        return false;
+        }
       if (game.moves.length === size * size) {
         game.winner = "draw";
         game.turn = null;
@@ -352,11 +445,17 @@ function () {
       if (game.isOver() || game.aiPlayer === null || game.turn !== game.aiPlayer) return null;
       game.aiThinking = true;
       var m = chooseMove(game.board, game.aiPlayer, game.humanPlayer, winLength, game.difficulty);
-      if (!isLegalMove(game.board, m[0], m[1])) { game.aiThinking = false; return null; }
-      var r = { x: m[0], y: m[1], player: game.aiPlayer };
-      game.place(m[0], m[1], game.aiPlayer);
+      if (!m || !isLegalMove(game.board, m[0], m[1])) { game.aiThinking = false; return null; }
+      var ok = game.place(m[0], m[1], game.aiPlayer);
+      if (!ok) {
+        // 落子被退回（黑棋雙活三首犯）：清掉 UI 提示並重選避開禁手的一手。
+        if (game.forbiddenWarn) game.forbiddenWarn = null;
+        m = chooseMove(game.board, game.aiPlayer, game.humanPlayer, winLength, game.difficulty);
+        if (m && isLegalMove(game.board, m[0], m[1])) ok = game.place(m[0], m[1], game.aiPlayer);
+        }
       game.aiThinking = false;
-      return r;
+      if (!ok) return null;
+      return { x: m[0], y: m[1], player: game.aiPlayer };
       };
 
     game.undo = function () {
@@ -372,6 +471,8 @@ function () {
         }
       game.winner = null;
       game.winLine = null;
+      game.forbidden = false;
+      game.forbiddenWarn = null;
       game.aiThinking = false;
       game.turn = game.moves.length === 0 ? BLACK : opponentOf(game.moves[game.moves.length - 1].player);
       return true;
@@ -383,7 +484,9 @@ function () {
         winner: game.winner,
         winLine: game.winLine,
         moves: game.moves.map(function (m) { return { x: m.x, y: m.y, player: m.player }; }),
-        turn: game.turn
+        turn: game.turn,
+        blackDoubleThreeWarned: game.blackDoubleThreeWarned,
+        forbidden: game.forbidden
         };
      };
 
@@ -397,10 +500,15 @@ function () {
   Game.opponentOf = opponentOf;
   Game.countLine = countLine;
   Game.winningLine = winningLine;
+  Game.isOpenFourThrough = isOpenFourThrough;
+  Game.isOpenThree = isOpenThree;
+  Game.isDoubleOpenThree = isDoubleOpenThree;
+  Game.isForbiddenMove = isForbiddenMove;
   Game.patternScore = patternScore;
   Game.evaluateCell = evaluateCell;
   Game.hasNeighbor = hasNeighbor;
   Game.candidateCells = candidateCells;
+  Game.legalCandidates = legalCandidates;
   Game.centerBias = centerBias;
   Game.scoreCell = scoreCell;
   Game.findWinningMove = findWinningMove;

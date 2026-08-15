@@ -448,3 +448,113 @@ test("smoke：小盤下滿可判定為和棋", () => {
   assert.equal(b5.winner, "draw");
   assert.ok(b5.isOver());
 });
+
+// ------------------------------------------------------------
+// 黑棋禁手：雙活三（三三）
+// 先手黑棋不得同時形成兩個活三；首犯退回一手並警告，當局再犯判負。
+// 白棋不受限；五連勝利優先於禁手。
+// ------------------------------------------------------------
+test("isOpenThree / isDoubleOpenThree 偵測活三與雙活三", () => {
+  var b = G.emptyBoard(15);
+  b[7][5] = G.BLACK; b[7][6] = G.BLACK; b[7][7] = G.BLACK;        // 橫向活三 .XXX.
+  assert.equal(G.isOpenThree(b, 7, 7, G.BLACK, 0, 1), true, "橫向活三");
+  b[5][7] = G.BLACK; b[6][7] = G.BLACK;                            // 加縱向活三（共用 7,7）
+  assert.equal(G.isOpenThree(b, 7, 7, G.BLACK, 1, 0), true, "縱向活三");
+  assert.equal(G.isDoubleOpenThree(b, 7, 7, G.BLACK), true, "雙活三");
+  var s = G.emptyBoard(15); s[7][5] = G.BLACK; s[7][6] = G.BLACK; s[7][7] = G.BLACK;
+  assert.equal(G.isDoubleOpenThree(s, 7, 7, G.BLACK), false, "僅一個活三非雙活三");
+  var c = G.emptyBoard(15); c[7][6] = G.BLACK; c[7][7] = G.BLACK; c[7][8] = G.BLACK;
+  c[7][5] = G.WHITE; c[7][9] = G.WHITE;                            // OXXXO → 眠三
+  assert.equal(G.isOpenThree(c, 7, 7, G.BLACK, 0, 1), false, "兩端被堵非活三");
+});
+
+test("isForbiddenMove：黑棋雙活三為禁手，五連勝利優先", () => {
+  var b = G.emptyBoard(15);
+  b[7][5] = G.BLACK; b[7][6] = G.BLACK;
+  b[5][7] = G.BLACK; b[6][7] = G.BLACK;
+  assert.equal(G.isForbiddenMove(b, 7, 7, G.BLACK, 5), true, "(7,7) 落黑成雙活三 → 禁手");
+  assert.equal(G.isForbiddenMove(b, 7, 7, G.WHITE, 5), false, "白棋永不禁手");
+  var w = G.emptyBoard(15);
+  w[7][5] = G.BLACK; w[7][6] = G.BLACK; w[7][7] = G.BLACK; w[7][8] = G.BLACK;
+  assert.equal(G.isForbiddenMove(w, 7, 9, G.BLACK, 5), false, "成五連非禁手（勝利優先）");
+  assert.equal(G.isForbiddenMove(G.emptyBoard(15), 7, 7, G.BLACK, 5), false, "孤立一手非禁手");
+});
+
+test("place 黑棋雙活三：首犯退回、再犯判負", () => {
+  var g = G.createGame({ vsAI: false });
+  g.place(7, 5, G.BLACK); g.place(0, 0, G.WHITE);
+  g.place(7, 6, G.BLACK); g.place(1, 2, G.WHITE);
+  g.place(5, 7, G.BLACK); g.place(2, 4, G.WHITE);
+  g.place(6, 7, G.BLACK); g.place(3, 6, G.WHITE);
+  assert.equal(g.blackDoubleThreeWarned, false);
+  // (7,7) 同時形成橫向與縱向活三 → 雙活三，首犯退回
+  var r = g.place(7, 7, G.BLACK);
+  assert.equal(r, false, "首犯雙活三：此手被退回");
+  assert.equal(g.board[7][7], G.EMPTY, "退回後該格為空");
+  assert.equal(g.currentPlayer(), G.BLACK, "仍輪黑棋重下");
+  assert.equal(g.blackDoubleThreeWarned, true, "已記錄一次警告");
+  assert.ok(g.forbiddenWarn, "產生禁手提示座標");
+  // 黑棋改下合法手
+  assert.equal(g.place(8, 8, G.BLACK), true);
+  g.place(4, 8, G.WHITE);
+  // 再次於 (7,7) 形成雙活三 → 當局再犯，黑棋判負
+  var r3 = g.place(7, 7, G.BLACK);
+  assert.equal(r3, true, "再犯：棋局結束回 true");
+  assert.equal(g.winner, G.WHITE, "黑棋判負，白棋勝");
+  assert.equal(g.forbidden, true);
+  assert.equal(g.board[7][7], G.BLACK, "再犯之手保留以顯示犯規位置");
+  assert.ok(g.isOver());
+});
+
+test("place 白棋雙活三不受限（禁手僅限黑棋）", () => {
+  var g = G.createGame({ vsAI: false });
+  g.place(0, 0, G.BLACK); g.place(7, 5, G.WHITE);
+  g.place(0, 5, G.BLACK); g.place(7, 6, G.WHITE);
+  g.place(0, 10, G.BLACK); g.place(5, 7, G.WHITE);
+  g.place(1, 3, G.BLACK); g.place(6, 7, G.WHITE);
+  g.place(2, 8, G.BLACK);   // 黑棋 filler，換白棋
+  var r = g.place(7, 7, G.WHITE);
+  assert.equal(r, true, "白棋雙活三可下");
+  assert.equal(g.board[7][7], G.WHITE);
+  assert.equal(g.winner, null, "白棋不判負");
+  assert.equal(g.currentPlayer(), G.BLACK, "換黑棋");
+});
+
+test("chooseMove 黑棋會避開雙活三禁手", () => {
+  var b = G.emptyBoard(15);
+  b[7][5] = G.BLACK; b[7][6] = G.BLACK;
+  b[5][7] = G.BLACK; b[6][7] = G.BLACK;
+  // (7,7) 是雙活三禁手；chooseMove（hard, 黑）不應選它
+  var m = G.chooseMove(b, G.BLACK, G.WHITE, 5, "hard");
+  assert.ok(!(m[0] === 7 && m[1] === 7), "不選禁手 (7,7)");
+  assert.equal(b[m[0]][m[1]], G.EMPTY, "落點為空");
+  assert.equal(G.isForbiddenMove(b, m[0], m[1], G.BLACK, 5), false, "所選非禁手");
+});
+
+test("aiMove（AI 為黑）避開雙活三、不自我判負", () => {
+  var g = G.createGame({ vsAI: true, aiPlayer: G.BLACK, difficulty: "hard" });
+  g.board[7][5] = G.BLACK; g.board[7][6] = G.BLACK; g.board[5][7] = G.BLACK; g.board[6][7] = G.BLACK;
+  g.turn = G.BLACK;
+  var m = g.aiMove();
+  assert.ok(m, "AI 回傳落點");
+  assert.ok(!(m.x === 7 && m.y === 7), "AI 不選禁手 (7,7)");
+  assert.equal(g.winner, null, "未自我判負");
+  assert.equal(g.forbidden, false);
+  assert.equal(g.board[m.x][m.y], G.BLACK, "確實落子");
+  assert.equal(g.currentPlayer(), G.WHITE, "輪到白棋");
+});
+
+test("reset / nextRound 清除雙活三警告狀態", () => {
+  var g = G.createGame({ vsAI: false });
+  g.place(7, 5, G.BLACK); g.place(0, 0, G.WHITE);
+  g.place(7, 6, G.BLACK); g.place(1, 2, G.WHITE);
+  g.place(5, 7, G.BLACK); g.place(2, 4, G.WHITE);
+  g.place(6, 7, G.BLACK); g.place(3, 6, G.WHITE);
+  g.place(7, 7, G.BLACK);   // 首犯退回 → warned=true
+  assert.equal(g.blackDoubleThreeWarned, true);
+  g.reset();
+  assert.equal(g.blackDoubleThreeWarned, false, "reset 清除警告");
+  assert.equal(g.forbidden, false);
+  g.nextRound();
+  assert.equal(g.blackDoubleThreeWarned, false, "nextRound 清除警告");
+});
