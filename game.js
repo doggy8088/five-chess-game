@@ -165,25 +165,95 @@ function () {
     return a - h * 0.95;
    }
 
-  function minimax(board, ai, human, min) {
-    var cands = candidateCells(board, 2);
-    var scored = cands.map(function (c) {
-      return { c: c, s: scoreCell(board, c[0], c[1], ai, human, min) };
-      });
-    scored.sort(function (a, b) { return b.s - a.s; });
-    var top = scored.slice(0, 8);
-    var best = null, bestScore = -Infinity;
-    for (var i = 0; i < top.length; i++) {
-      var my = top[i].c;
-      var rb = cloneBoard(board); rb[my[0]][my[1]] = ai;
-      if (findWinningMove(rb, human, min)) continue; // 對手可立即反殺
-      var opp = greedyMove(rb, human, ai, min, 0);
-      var rc = cloneBoard(rb); rc[opp[0]][opp[1]] = human;
-      var val = staticEval(rc, ai, human, min);
-      if (val > bestScore) { bestScore = val; best = my; }
+   // 防禦權重：對手 threat 比本方略高，避免被活叉／雙 threat 反殺。
+  var DEFENSE_W = 1.2;
+
+   // 威脅感知評估：數出該色的「活棋」（活三／活四／活叉）。
+   // 活四＝下一手必殺；兩個活三（或活三＋活四）＝活叉，幾乎必勝，故權重極高。
+   // 每條線僅從其「第一顆」計數，同一方向不重複加總。
+  function threatScore(board, who, min) {
+    min = min || 5;
+    var size = board.length, four = 0, openThree = 0, three = 0, openTwo = 0;
+    for (var x = 0; x < size; x++) {
+      for (var y = 0; y < size; y++) {
+        if (board[x][y] !== who) continue;
+        for (var d = 0; d < DIRS.length; d++) {
+          var dx = DIRS[d][0], dy = DIRS[d][1];
+           // 僅當 (x-d) 非同色時，本顆才是該連的第一顆，避免重複計數
+          var px = x - dx, py = y - dy;
+          if (inBounds(size, px, py) && board[px][py] === who) continue;
+          var nx = x + dx, ny = y + dy, cnt = 1;
+          while (inBounds(size, nx, ny) && board[nx][ny] === who) { cnt++; nx += dx; ny += dy; }
+          var endA = inBounds(size, nx, ny) && board[nx][ny] === EMPTY;
+          var endB = inBounds(size, px, py) && board[px][py] === EMPTY;
+          if (cnt >= min) four += 2;                  // 已成型或將成五連
+          else if (cnt === 4) {
+            if (endA && endB) four += 2;             // 活四：兩端皆活，下一步必殺
+            else if (endA || endB) four += 1;       // 帶擋／單邊四
+          } else if (cnt === 3) {
+            if (endA && endB) openThree += 1;         // 活三
+            else if (endA || endB) three += 1;       // 半活三
+          } else if (cnt === 2) {
+            if (endA && endB) openTwo += 1;          // 活雙
+          }
+        }
       }
-    return best;
-   }
+    }
+    var s = four * 100000 + openThree * 12000 + three * 1500 + openTwo * 150;
+    if (openThree >= 2) s += 40000;                 // 活叉：兩個活三
+    if (openThree + four >= 2) s += 20000;         // 活三再疊其他活 threat
+    return s;
+  }
+
+  // 整盤評估：本方 threat 減去對手 threat（略高權重）。
+  function evalBoard(board, ai, human, min) {
+    return threatScore(board, ai, min) - threatScore(board, human, min) * DEFENSE_W;
+  }
+
+  // 威脅感知的 alpha-beta 搜索（困難等級用）。
+  // depth 預設 3 手：本方→對方反擊→本方，足以看穿活叉與雙 threat。
+  function minimax(board, ai, human, min, depth) {
+    min = min || 5;
+    depth = depth || 3;
+    var BUDGET = 0x100000;                         // 節點上限，避免極端局勢失控
+    var nodes = 0;
+    function ordered(board, me, opp) {
+      var cands = candidateCells(board, 2);
+      if (cands.length === 0) return null;
+      var scored = cands.map(function (c) {
+        return { c: c, s: scoreCell(board, c[0], c[1], me, opp, min) };
+      });
+      scored.sort(function (a, b) { return b.s - a.s; });
+      return scored.slice(0, 10).map(function (o) { return o.c; });
+    }
+    function search(board, me, opp, d, alpha, beta) {
+      if (nodes++ > BUDGET) return null;           // 節點用盡：回傳 null 由上層略過
+      var win = findWinningMove(board, me, min);
+      if (win) return { move: win, v: 10000000 - (depth - d) }; // 越快取殺分越高
+      var cands = ordered(board, me, opp);
+      if (!cands) return { move: null, v: 0 };
+      var best = cands[0], bv = -Infinity;
+      for (var i = 0; i < cands.length; i++) {
+        var cell = cands[i];
+        board[cell[0]][cell[1]] = me;
+        var v;
+        if (d <= 1) {
+          v = evalBoard(board, me, opp, min);
+        } else {
+          var r = search(board, opp, me, d - 1, -beta, -alpha);
+          v = (r === null) ? 0 : -r.v;             // 對手節點用盡 → 中性處理
+        }
+        board[cell[0]][cell[1]] = EMPTY;
+        if (v > bv) { bv = v; best = cell; }
+        if (v > alpha) alpha = v;
+        if (alpha >= beta) break;                  // alpha-beta 剪枝
+      }
+      return { move: best, v: bv };
+    }
+    var result = search(board, ai, human, depth, -Infinity, Infinity);
+    if (!result) return greedyMove(board, ai, human, min, 0); // 預算用盡：退回貪婪，保證合法落點
+    return result.move;
+  }
 
   function chooseMove(board, ai, human, min, difficulty) {
     difficulty = difficulty || "hard";
@@ -336,6 +406,8 @@ function () {
   Game.findWinningMove = findWinningMove;
   Game.greedyMove = greedyMove;
   Game.staticEval = staticEval;
+  Game.threatScore = threatScore;
+  Game.evalBoard = evalBoard;
   Game.minimax = minimax;
   Game.chooseMove = chooseMove;
   Game.createGame = createGame;

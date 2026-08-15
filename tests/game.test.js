@@ -208,6 +208,96 @@ test("chooseMove easy 兩分支由 Math.random 控制", () => {
 });
 
 // ------------------------------------------------------------
+// 防禦／活叉：困難等級的核心（防止被活叉輕鬆反殺）
+// ------------------------------------------------------------
+test("threatScore 偵測活棋，活四分數高於活三", () => {
+  var b3 = G.emptyBoard(15); b3[7][7] = G.BLACK; b3[7][8] = G.BLACK; b3[7][9] = G.BLACK;        // 活三
+  var b4 = G.emptyBoard(15); b4[7][7] = G.BLACK; b4[7][8] = G.BLACK; b4[7][9] = G.BLACK; b4[7][10] = G.BLACK; // 活四
+  var s3 = G.threatScore(b3, G.BLACK, 5);
+  var s4 = G.threatScore(b4, G.BLACK, 5);
+  assert.ok(s3 > 0, "活三有分數");
+  assert.ok(s4 > s3, "活四分數高於活三");
+});
+
+test("threatScore 辨識活叉（兩個活三）分數顯著高於單活三", () => {
+  var single = G.emptyBoard(15); single[7][7] = G.BLACK; single[7][8] = G.BLACK; single[7][9] = G.BLACK;
+  var fork = G.emptyBoard(15);
+  fork[7][7] = G.BLACK; fork[7][8] = G.BLACK; fork[7][9] = G.BLACK;   // 橫向活三
+  fork[8][7] = G.BLACK; fork[9][7] = G.BLACK;                          // 縱向活三（共用 7,7）→ 活叉
+  var sf = G.threatScore(fork, G.BLACK, 5);
+  var ss = G.threatScore(single, G.BLACK, 5);
+  assert.ok(sf > ss * 3, "活叉分數應顯著高於單活三");
+});
+
+test("evalBoard 認出對手活叉的危險（防禦不再被低估）", () => {
+  var flat = G.emptyBoard(15); flat[7][7] = G.WHITE;
+  var fork = G.emptyBoard(15);
+  fork[7][7] = G.BLACK; fork[7][8] = G.BLACK; fork[7][9] = G.BLACK;
+  fork[8][7] = G.BLACK; fork[9][7] = G.BLACK;
+  assert.equal(G.evalBoard(flat, G.WHITE, G.BLACK, 5), 0, "平局形勢評分為 0");
+  assert.ok(G.evalBoard(fork, G.WHITE, G.BLACK, 5) < -10000, "遭遇對手活叉時評分應極負");
+});
+
+test("chooseMove 困難：面對活叉會防禦／還擊，而非放任", () => {
+  var mk = function () {
+    var b = G.emptyBoard(15);
+    b[7][7] = G.BLACK; b[7][8] = G.BLACK; b[7][9] = G.BLACK;  // 橫向活三
+    b[8][7] = G.BLACK; b[9][7] = G.BLACK;                     // 縱向活三（活叉）
+    b[8][9] = G.WHITE;                                         // AI 附近有點（避免走中央）
+    return b;
+     };
+  var before = G.threatScore(mk(), G.BLACK, 5);
+  var m = G.chooseMove(mk(), G.WHITE, G.BLACK, 5, "hard");
+  var after = G.cloneBoard(mk()); after[m[0]][m[1]] = G.WHITE;
+  var humanThreat = G.threatScore(after, G.BLACK, 5);
+  var aiThreat = G.threatScore(after, G.WHITE, 5);
+  assert.equal(after[m[0]][m[1]], G.WHITE, "確實落子");
+  assert.ok(humanThreat < before, "對手威脅分數下降（活叉被破／被擋）");
+  assert.ok(humanThreat < 40000 || aiThreat >= 40000, "活叉被破，或 AI 反建活叉");
+});
+
+test("regression：威脅型人類再無法輕鬆贏困難 AI（困難不應弱於中等）", () => {
+  // 模擬會「擋活三、造活叉」的會下棋對手。舊版困難在 12 局中 12 局敗，
+  // 新版困難（威脅感知搜索）應穩定不敗。
+  function tScore(board, who) { return G.threatScore(board, who, 5); }
+  function scriptedHuman(board) {
+    var win = G.findWinningMove(board, G.BLACK, 5); if (win) return win;
+    var block = G.findWinningMove(board, G.WHITE, 5); if (block) return block;
+    var cs = G.candidateCells(board, 2);
+    var best = null, bestS = -Infinity;
+    for (var i = 0; i < cs.length; i++) {
+      var c = cs[i];
+      board[c[0]][c[1]] = G.BLACK;
+      var s = tScore(board, G.BLACK) + 0.6 * tScore(board, G.WHITE);
+      board[c[0]][c[1]] = G.EMPTY;
+      if (s > bestS) { bestS = s; best = c; }
+      }
+    return best || [7, 7];
+     }
+  var humanWins = 0, games = 12;
+  for (var g = 0; g < games; g++) {
+    var board = G.emptyBoard(15);
+    var mover = G.BLACK;
+    for (var t = 0; t < 226; t++) {
+      var m = (mover === G.BLACK)
+        ? scriptedHuman(board)
+        : G.chooseMove(board, G.WHITE, G.BLACK, 5, "hard");
+      if (!m || !G.isLegalMove(board, m[0], m[1])) {
+        m = G.greedyMove(board, mover, G.opponentOf(mover), 5, 0);
+     }
+      if (!m || !G.isLegalMove(board, m[0], m[1])) break;   // 棋盤將滿
+      board[m[0]][m[1]] = mover;
+      if (G.winningLine(board, m[0], m[1], mover, 5)) {
+        if (mover === G.BLACK) humanWins++;
+        break;
+        }
+      mover = mover === G.BLACK ? G.WHITE : G.BLACK;
+      }
+    }
+  assert.ok(humanWins <= 1, "困難 AI 不應被威脅型人類穩壓（humanWins=" + humanWins + "/" + games + "）");
+});
+
+// ------------------------------------------------------------
 // createGame：控制器
 // ------------------------------------------------------------
 test("createGame 選項與預設", () => {
