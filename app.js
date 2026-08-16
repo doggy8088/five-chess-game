@@ -570,12 +570,19 @@
       if (game.winLine) view.markWin(game.winLine);
          }
 
+  function closeSettingsPanel() {
+      if (window.innerWidth > 760) return;
+      els.dock.classList.add("hidden");
+      els.dockOpen.classList.add("show");
+       }
+
 
   function newGame() {
       game = G.createGame({ size: SIZE, vsAI: vsAI, aiPlayer: G.WHITE, difficulty: difficulty });
       undoUsed = 0;
       view.clearMarks();
       view.reset();
+      closeSettingsPanel();
       hideOverlay();
       if (els.toast) els.toast.classList.remove("show");
       refresh();

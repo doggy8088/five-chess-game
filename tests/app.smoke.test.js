@@ -214,6 +214,28 @@ test("app 新局：清空棋子、隱藏浮層", () => {
   assert.equal(overlay.classList.contains("show"), false);
 });
 
+test("app 新局：關閉行動版設定面板", () => {
+  var dock = DOM.getElementById("dock");
+  var dockOpen = DOM.getElementById("dock-open");
+  var originalWidth = window.innerWidth;
+  window.innerWidth = 390;
+  dock.classList.remove("hidden");
+  dockOpen.classList.remove("show");
+  DOM.getElementById("btn-new").dispatch("click");
+  assert.equal(dock.classList.contains("hidden"), true, "控制列新局會關閉設定面板");
+  assert.equal(dockOpen.classList.contains("show"), true, "關閉後顯示設定面板開啟鈕");
+
+  dock.classList.remove("hidden");
+  dockOpen.classList.remove("show");
+  overlay.classList.add("show");
+  DOM.getElementById("ov-new").dispatch("click");
+  assert.equal(dock.classList.contains("hidden"), true, "結果看板新局也會關閉設定面板");
+  assert.equal(overlay.classList.contains("show"), false, "結果看板新局會關閉結果看板");
+
+  window.innerWidth = originalWidth;
+  window.dispatchResize();
+});
+
 // 覆蓋 finish() 路徑：透過公開 API 下成 5 連後結束
 test("app 勝負浮層：finish() 設定狀態與浮層", () => {
   var API = global.window.GomokuApp;
