@@ -594,7 +594,13 @@
        }
 
   function showOverlay() {
+      if (view && view.hideMoveNumbers) view.hideMoveNumbers();
       els.overlay.classList.add("show");
+       }
+
+  function reopenOverlay() {
+      if (!game.isOver()) return;
+      showOverlay();
        }
 
   function shareCondition() {
@@ -822,10 +828,12 @@
       var tp = game.currentPlayer();
       if (game.isOver()) {
         els.turn.classList.remove("active");
+        els.turn.classList.add("result-prompt");
         els.turnLabel.textContent = game.winner === "draw" ? "和棋" : "棋局結束";
         }
       else {
         els.turn.classList.add("active");
+        els.turn.classList.remove("result-prompt");
         els.turnDot.className = "dot " + (tp === G.BLACK ? "stone-black" : "stone-white");
         var t = tp === G.BLACK ? "輪到黑棋" : "輪到白棋";
         if (game.vsAI) t += tp === game.humanPlayer ? "（你）" : "（AI 思考中…）";
@@ -900,6 +908,7 @@
        els.overlayNew.addEventListener("click", newGame);
        els.overlayClose.addEventListener("click", closeOverlay);
        els.overlayShare.addEventListener("click", shareResult);
+       els.turn.addEventListener("click", reopenOverlay);
        els.zoomRange.addEventListener("input", function () { setZoom(els.zoomRange.value); });
        $("btn-undo").addEventListener("click", function () {
         if (undoUsed >= undoLimit()) return;   // 已達本局撤銷上限

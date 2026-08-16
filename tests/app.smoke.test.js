@@ -238,6 +238,7 @@ test("app 新局：關閉行動版設定面板", () => {
 
 test("app 行動版結果流程：勝負訊息與新局分享按鈕同步顯示", () => {
   var API = global.window.GomokuApp;
+  var turn = DOM.getElementById("turn");
   var originalWidth = window.innerWidth;
   var realSetTimeoutFlow = global.setTimeout;
   var scheduled = [];
@@ -261,6 +262,14 @@ test("app 行動版結果流程：勝負訊息與新局分享按鈕同步顯示"
 
     DOM.getElementById("ov-close").dispatch("click");
     assert.equal(overlay.classList.contains("show"), false, "X 關閉結果看板後回到棋盤頁面");
+    assert.equal(turn.classList.contains("result-prompt"), true, "棋局結束提示可再次操作");
+
+    turn.dispatch("click");
+    assert.equal(overlay.classList.contains("show"), true, "點擊棋局結束可重新開啟結果看板");
+
+    DOM.getElementById("ov-new").dispatch("click");
+    assert.equal(overlay.classList.contains("show"), false, "重新開啟後可從結果看板開始新局");
+    assert.equal(stones.textContent, "0 / 225", "結果看板的新局按鈕會清空棋盤");
   } finally {
     global.setTimeout = realSetTimeoutFlow;
     window.innerWidth = originalWidth;
