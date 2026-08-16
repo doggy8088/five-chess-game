@@ -77,10 +77,6 @@ header.top{
 .turn.active{ transform:scale(1.04); border-color:var(--accent-2);
   box-shadow:0 0 0 1px var(--accent-2),0 18px 40px rgba(0,0,0,.55); }
 .turn .who{ min-width:84px; }
-.turn.result-prompt{ cursor:pointer; border-color:var(--accent-2);
-  box-shadow:0 0 0 1px rgba(84,209,255,.42),0 18px 40px rgba(0,0,0,.55); }
-.turn.result-prompt:active{ transform:scale(.98); }
-
 /* ---------------- 控制列 ---------------- */
 #dock{
   position:absolute; z-index:5; left:50%; transform:translateX(-50%); bottom:22px;
@@ -226,11 +222,6 @@ button.btn.primary{ background:linear-gradient(180deg,var(--accent),#e85f40); bo
   #hint{ display:none; }
   .brand .cn{ display:none; }
   #overlay .card{ min-height:270px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-  #overlay:not(.message-closed) .overlay-actions{ display:none; }
-  #overlay.message-closed .emoji,
-  #overlay.message-closed h2,
-  #overlay.message-closed p{ display:none; }
-  #overlay.message-closed .overlay-actions{ display:flex; }
   #dock{ width:94vw; max-width:94vw; flex-wrap:wrap; justify-content:center; }
   #dock .seg{ flex:1 1 100%; justify-content:center; }
   #dock .divider{ display:none; }

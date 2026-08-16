@@ -236,9 +236,8 @@ test("app 新局：關閉行動版設定面板", () => {
   window.dispatchResize();
 });
 
-test("app 行動版結果流程：訊息與新局分享按鈕維持同一頁", () => {
+test("app 行動版結果流程：勝負訊息與新局分享按鈕同步顯示", () => {
   var API = global.window.GomokuApp;
-  var turn = DOM.getElementById("turn");
   var originalWidth = window.innerWidth;
   var realSetTimeoutFlow = global.setTimeout;
   var scheduled = [];
@@ -257,22 +256,11 @@ test("app 行動版結果流程：訊息與新局分享按鈕維持同一頁", (
     API.finish();
     scheduled[0].fn(); // 延遲顯示結果看板
     assert.equal(overlay.classList.contains("show"), true, "結果訊息顯示於結果看板");
-    assert.equal(overlay.classList.contains("message-closed"), false, "初始先顯示勝負訊息");
-
-    scheduled.find(function (task) { return task.delay === 3000; }).fn();
-    assert.equal(overlay.classList.contains("show"), true, "三秒後仍留在同一個結果看板");
-    assert.equal(overlay.classList.contains("message-closed"), true, "三秒後顯示新局與分享按鈕");
+    assert.equal(overlay.classList.contains("message-closed"), false, "結果看板不切換成分離狀態");
+    assert.equal(scheduled.some(function (task) { return task.delay === 3000; }), false, "不再排程分段顯示計時器");
 
     DOM.getElementById("ov-close").dispatch("click");
     assert.equal(overlay.classList.contains("show"), false, "X 關閉結果看板後回到棋盤頁面");
-    assert.equal(turn.classList.contains("result-prompt"), true, "棋局結束提示進入可操作狀態");
-
-    scheduled[scheduled.length - 1].fn();
-    assert.equal(overlay.classList.contains("show"), true, "棋局結束提示三秒後重新顯示操作按鈕");
-    DOM.getElementById("ov-close").dispatch("click");
-    turn.dispatch("click");
-    assert.equal(overlay.classList.contains("show"), true, "點擊棋局結束提示重新顯示操作按鈕");
-    assert.equal(overlay.classList.contains("message-closed"), true, "點擊後直接顯示新局與分享按鈕");
   } finally {
     global.setTimeout = realSetTimeoutFlow;
     window.innerWidth = originalWidth;
