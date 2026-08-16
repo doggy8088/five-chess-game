@@ -186,6 +186,22 @@ test("3D 路徑：勝局高亮與動畫", async () => {
   assert.ok(API.game.isOver());
 });
 
+test("3D 滾輪縮放：同步百分比、滑桿與無障礙文字", () => {
+  var range = els.getElementById("zoom-range");
+  var value = els.getElementById("zoom-value");
+  range.value = "100";
+  range.dispatch("input");
+
+  gl.dispatch("wheel", { deltaX: 0, deltaY: -120, preventDefault() {} });
+
+  assert.equal(value.textContent, "110%", "向上滾輪後百分比必須依原縮放速度更新");
+  assert.equal(value.textContent, range.value + "%", "百分比必須與滑桿值一致");
+  assert.equal(range.getAttribute("aria-valuetext"), value.textContent, "無障礙文字必須同步");
+
+  range.value = "100";
+  range.dispatch("input");
+});
+
 
 // 3D 路徑：拖曳 / 離場 / 縮放 / 難度 / 黑白和 狀態分支
 test("3D 路徑：事件、難度、勝負狀態", async () => {

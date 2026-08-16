@@ -185,6 +185,7 @@
 
         // 攝影機 orbit
       var orbit = { radius: 15, theta: 0.6, phi: 0.92, last: { x: 0, y: 0 } };
+      var reportedZoom = DEFAULT_ZOOM, onZoomCb = null;
       function applyCam() {
         orbit.radius = Math.max(8, Math.min(30, orbit.radius));
         var sp = Math.sin(orbit.phi), cp = Math.cos(orbit.phi);
@@ -195,7 +196,8 @@
         camera.lookAt(0, 0.2, 0);
          }
       function setZoom(percent) {
-        var zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Number(percent) || DEFAULT_ZOOM));
+        var zoom = normalizeZoom(percent);
+        reportedZoom = zoom;
         orbit.radius = 15 * DEFAULT_ZOOM / zoom;
          }
 
@@ -316,7 +318,11 @@
       canvas.addEventListener("pointerleave", function () { hover.visible = false; if (onHoverCb) onHoverCb(null); });
       canvas.addEventListener("wheel", function (e) {
         e.preventDefault();
-        orbit.radius = Math.max(8, Math.min(30, orbit.radius + e.deltaY * 0.012));
+        var minRadius = 15 * DEFAULT_ZOOM / ZOOM_MAX;
+        var maxRadius = 15 * DEFAULT_ZOOM / ZOOM_MIN;
+        orbit.radius = Math.max(minRadius, Math.min(maxRadius, orbit.radius + e.deltaY * 0.012));
+        var zoom = normalizeZoom(15 * DEFAULT_ZOOM / orbit.radius);
+        if (zoom !== reportedZoom && onZoomCb) onZoomCb(zoom);
          }, { passive: false });
 
       var clock = 0;
@@ -354,6 +360,7 @@
         showMoveNumbers: function () { labels.visible = true; },
         hideMoveNumbers: function () { labels.visible = false; },
         setZoom: setZoom,
+        onZoom: function (cb) { onZoomCb = cb; },
         reset: function () { clearGroup(stones); clearGroup(labels); clearGroup(marks); labels.visible = false; lastMarker.visible = false; animators.length = 0; },
         onPick: function (cb) { onPickCb = cb; },
         onHover: function (cb) { onHoverCb = cb; },
@@ -520,6 +527,7 @@
       view.onHover(function (cell) {
         // 可顯示座標提示；回呼不影響邏輯
       });
+      if (view.onZoom) view.onZoom(setZoom);
       if (!use3D) els.hint.textContent = "已切換 2D 模式（無法載入 3D 引擎）· 點擊棋盤落子";
       setZoom(currentZoom);
        }
