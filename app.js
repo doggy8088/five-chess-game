@@ -10,7 +10,33 @@
 
      var SIZE = 15;
      var ZOOM_MIN = 70, ZOOM_MAX = 130, DEFAULT_ZOOM = 100;
-    var difficulty = "hard";   // easy | medium | hard
+     var SETTINGS_KEY = "gomoku-settings-v1";
+
+  function normalizeDifficulty(value) {
+      return value === "easy" || value === "medium" || value === "hard" ? value : "hard";
+       }
+
+  function normalizeZoom(value) {
+      var zoom = Number(value);
+      if (!isFinite(zoom)) zoom = DEFAULT_ZOOM;
+      zoom = Math.round(zoom / 5) * 5;
+      return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom));
+       }
+
+  function loadSettings() {
+      try {
+        var raw = localStorage.getItem(SETTINGS_KEY);
+        if (raw) {
+          var saved = JSON.parse(raw);
+          return { difficulty: normalizeDifficulty(saved.difficulty), zoom: normalizeZoom(saved.zoom) };
+        }
+      } catch (e) { /* 忽略損壞或不可用的設定 */ }
+      return { difficulty: "hard", zoom: DEFAULT_ZOOM };
+       }
+
+  var savedSettings = loadSettings();
+    var difficulty = savedSettings.difficulty;   // easy | medium | hard
+    var currentZoom = savedSettings.zoom;
     var vsAI = true;
     var game = G.createGame({ size: SIZE, vsAI: vsAI, aiPlayer: G.WHITE, difficulty: difficulty });
 
@@ -32,9 +58,15 @@
      toast: $("toast"),
      overlay: $("overlay"), overlayClose: $("ov-close"), ovEmoji: $("ov-emoji"), ovTitle: $("ov-title"), ovSub: $("ov-sub"),
      zoomRange: $("zoom-range"), zoomValue: $("zoom-value"),
-     overlayNew: $("ov-new"), modeLabel: $("mode-label"),
+     overlayNew: $("ov-new"), overlayShare: $("ov-share"), modeLabel: $("mode-label"),
      dock: $("dock"), dockClose: $("dock-close"), dockOpen: $("dock-open")
      };
+
+  function saveSettings() {
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({ difficulty: difficulty, zoom: currentZoom }));
+      } catch (e) { /* 忽略不可用的儲存空間 */ }
+       }
 
      /* ---------------- 對戰統計（localStorage 持久化） ---------------- */
   var STATS_KEY = "gomoku-stats-v1";
@@ -86,7 +118,7 @@
       var THREE = window.THREE;
       var canvas = els.gl;
 
-      var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+      var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -489,7 +521,7 @@
         // 可顯示座標提示；回呼不影響邏輯
       });
       if (!use3D) els.hint.textContent = "已切換 2D 模式（無法載入 3D 引擎）· 點擊棋盤落子";
-      setZoom(els.zoomRange.value || DEFAULT_ZOOM);
+      setZoom(currentZoom);
        }
 
   function forbiddenLabel(type) {
@@ -552,6 +584,112 @@
   function closeOverlay() {
       hideOverlay();
       if (view && view.showMoveNumbers) view.showMoveNumbers();
+       }
+
+  function shareCondition() {
+      var mode = game.vsAI ? "對戰 AI · 難度：" + diffName() : "雙人對戰";
+      return mode + " · " + (els.ovTitle.textContent || "棋局結束") + " · 15×15 棋盤 · " + game.moves.length + " 手";
+       }
+
+  function makeShareCanvas() {
+      var source = view && view._2d ? els.fb : els.gl;
+      var sourceWidth = source.width || Math.max(1, Math.round(window.innerWidth * (window.devicePixelRatio || 1)));
+      var sourceHeight = source.height || Math.max(1, Math.round(window.innerHeight * (window.devicePixelRatio || 1)));
+      var textScale = Math.max(0.8, Math.min(2, sourceWidth / 900));
+      var headerHeight = Math.max(92, Math.round(96 * textScale));
+      var footerHeight = Math.max(100, Math.round(112 * textScale));
+      var canvas = document.createElement("canvas");
+      canvas.width = sourceWidth;
+      canvas.height = headerHeight + sourceHeight + footerHeight;
+      var c = canvas.getContext("2d");
+      var bg = c.createLinearGradient(0, 0, canvas.width, canvas.height);
+      bg.addColorStop(0, "#0b1020");
+      bg.addColorStop(0.58, "#141b31");
+      bg.addColorStop(1, "#090d19");
+      c.fillStyle = bg;
+      c.fillRect(0, 0, canvas.width, canvas.height);
+      c.fillStyle = "rgba(12, 17, 34, 0.88)";
+      c.fillRect(0, headerHeight, canvas.width, sourceHeight);
+      c.drawImage(source, 0, headerHeight, sourceWidth, sourceHeight);
+
+      var pad = Math.round(32 * textScale);
+      c.fillStyle = "#eaf0ff";
+      c.textAlign = "left";
+      c.textBaseline = "alphabetic";
+      c.font = "800 " + Math.round(25 * textScale) + "px PingFang TC, Noto Sans TC, sans-serif";
+      c.fillText("五子棋 · GOMOKU", pad, Math.round(38 * textScale));
+      c.fillStyle = "#9fb0d4";
+      c.font = "600 " + Math.round(15 * textScale) + "px PingFang TC, Noto Sans TC, sans-serif";
+      c.fillText(shareCondition(), pad, Math.round(68 * textScale));
+
+      var footerTop = headerHeight + sourceHeight;
+      c.fillStyle = "rgba(9, 13, 25, 0.92)";
+      c.fillRect(0, footerTop, canvas.width, footerHeight);
+      c.fillStyle = "#9fb0d4";
+      c.font = "600 " + Math.round(17 * textScale) + "px PingFang TC, Noto Sans TC, sans-serif";
+      c.textAlign = "right";
+      c.fillText("Made with ❤️ by Will 保哥", canvas.width - pad, canvas.height - Math.round(28 * textScale));
+      return canvas;
+       }
+
+  function canvasToBlob(canvas) {
+      return new Promise(function (resolve, reject) {
+        try {
+          var data = canvas.toDataURL("image/png");
+          var binary = atob(data.split(",")[1]);
+          var bytes = new Uint8Array(binary.length);
+          for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          resolve(new Blob([bytes], { type: "image/png" }));
+        } catch (e) {
+          if (!canvas.toBlob) { reject(e); return; }
+          canvas.toBlob(function (blob) {
+            if (blob) resolve(blob); else reject(e);
+             }, "image/png");
+        }
+         });
+       }
+
+  function downloadShareImage(blob) {
+      if (typeof URL === "undefined" || !URL.createObjectURL || !document.body) return false;
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement("a");
+      link.href = url;
+      link.download = "gomoku-result.png";
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      return true;
+       }
+
+  function fallbackShare(blob) {
+      if (downloadShareImage(blob)) showWarning("已下載棋局圖片，可從照片或檔案分享。");
+      else showWarning("目前無法建立棋局圖片。");
+       }
+
+  function shareResult() {
+      if (!game.isOver() || !els.overlayShare) return;
+      els.overlayShare.disabled = true;
+      Promise.resolve().then(function () { return canvasToBlob(makeShareCanvas()); }).then(function (blob) {
+        var nav = typeof navigator !== "undefined" ? navigator : null;
+        var canUseFileShare = nav && typeof nav.share === "function" && typeof nav.canShare === "function" && typeof File !== "undefined";
+        if (canUseFileShare) {
+          try { canUseFileShare = nav.canShare({ files: [new File([blob], "gomoku-result.png", { type: "image/png" })] }); }
+          catch (e) { canUseFileShare = false; }
+        }
+        if (!canUseFileShare) {
+          fallbackShare(blob);
+          return;
+        }
+        var file = new File([blob], "gomoku-result.png", { type: "image/png" });
+        return nav.share({ title: "五子棋對局結果", text: shareCondition(), files: [file] })
+          .then(function () { showWarning("已開啟分享選單，可分享或儲存到照片。"); })
+          .catch(function (err) {
+            if (!err || err.name !== "AbortError") fallbackShare(blob);
+             });
+         }).catch(function () { showWarning("目前無法建立棋局圖片。"); })
+        .finally(function () { els.overlayShare.disabled = false; });
        }
 
   function finish() {
@@ -628,16 +766,24 @@
       $("btn-undo").disabled = locked || game.moves.length === 0 || undoUsed >= undoLimit();
        }
 
+  function syncDifficultyButtons() {
+      document.querySelectorAll(".seg [data-diff]").forEach(function (button) {
+        button.setAttribute("aria-pressed", button.getAttribute("data-diff") === difficulty ? "true" : "false");
+         });
+       }
+
   function diffName() { return difficulty === "easy" ? "簡單" : difficulty === "medium" ? "中等" : "困難"; }
 
   function onPick(pos) { placeAt(pos); }
 
   function setZoom(percent) {
-      var zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Number(percent) || DEFAULT_ZOOM));
+      var zoom = normalizeZoom(percent);
+      currentZoom = zoom;
       els.zoomRange.value = String(zoom);
       els.zoomRange.setAttribute("aria-valuetext", zoom + "%");
       els.zoomValue.textContent = zoom + "%";
       if (view && view.setZoom) view.setZoom(zoom);
+      saveSettings();
        }
 
   function syncDock() {
@@ -653,15 +799,15 @@
         b.addEventListener("click", function () {
           difficulty = b.getAttribute("data-diff");
           game.difficulty = difficulty;
-          document.querySelectorAll(".seg [data-diff]").forEach(function (x) {
-            x.setAttribute("aria-pressed", x === b ? "true" : "false");
-             });
+          syncDifficultyButtons();
+          saveSettings();
           refresh();
            });
          });
        $("btn-new").addEventListener("click", newGame);
        els.overlayNew.addEventListener("click", newGame);
        els.overlayClose.addEventListener("click", closeOverlay);
+       els.overlayShare.addEventListener("click", shareResult);
        els.zoomRange.addEventListener("input", function () { setZoom(els.zoomRange.value); });
        $("btn-undo").addEventListener("click", function () {
         if (undoUsed >= undoLimit()) return;   // 已達本局撤銷上限
@@ -699,6 +845,7 @@
   function boot() {
       buildView();
       wireUI();
+      syncDifficultyButtons();
       refresh();
       // 此設定黑棋先手，AI 為白，無需自動先行。
       setTimeout(function () { els.hint.style.opacity = "0"; }, 6500);
@@ -712,6 +859,8 @@
       get stats() { return stats; },
       place: function (x, y) { placeAt({ x: x, y: y }); },
       finish: finish,
+      share: shareResult,
+      captureShare: makeShareCanvas,
       refresh: refresh,
       newGame: newGame,
       undo: function () {

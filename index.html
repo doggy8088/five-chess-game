@@ -63,7 +63,7 @@
 </script>
 
 <!-- 本地資產版本戳：更新 JS／CSS 時同步修改，避免瀏覽器沿用舊快取。 -->
-<link rel="stylesheet" href="styles.css?v=20260816-1" />
+<link rel="stylesheet" href="styles.css?v=20260816-4" />
 
 <!-- three.js 是唯一的第三方資源，由 CDN 載入（不用 build、無本地相依）。
      若離線／被擋住時，頁面會自動改用 2D Canvas 渲染，確保始終可玩。 -->
@@ -145,11 +145,20 @@
      <div class="emoji" id="ov-emoji">🏆</div>
      <h2 id="ov-title">黑棋獲勝</h2>
      <p id="ov-sub">五子連連</p>
-     <button class="btn primary" id="ov-new">再下一局</button>
+     <div class="overlay-actions">
+       <button class="btn primary" id="ov-new" type="button">
+         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3.5 7.1"/><path d="M3 22v-6h6"/></svg>
+         新局
+       </button>
+       <button class="btn" id="ov-share" type="button" aria-label="分享棋局圖片">
+         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></svg>
+         分享
+       </button>
+     </div>
    </div>
 </div>
 
-<script src="game.js?v=20260816-1"></script>
-<script src="app.js?v=20260816-1"></script>
+<script src="game.js?v=20260816-4"></script>
+<script src="app.js?v=20260816-4"></script>
 </body>
 </html>

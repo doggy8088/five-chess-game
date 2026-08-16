@@ -30,7 +30,7 @@ function makeCanvas(rect) {
     setTransform() {}, clearRect() {}, fillRect() {}, strokeRect() {},
     beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, fill() {},
     arc() {}, arcTo() {}, closePath() {},
-    fillText() { this._numberDraws++; }, strokeText() {}, _numberDraws: 0,
+    fillText(text) { this._numberDraws++; this._fillTexts.push(String(text)); }, strokeText() {}, drawImage() {}, _numberDraws: 0, _fillTexts: [],
     createLinearGradient() { return this._grad; },
     createRadialGradient() { return this._grad; }
     };
@@ -196,6 +196,18 @@ test("app 棋盤縮放控制：更新縮放比例顯示", () => {
   assert.equal(value.textContent, "100%");
 });
 
+test("app 設定：記憶最後選擇的難度與縮放比例", () => {
+  var range = DOM.getElementById("zoom-range");
+  setDiff("easy");
+  range.value = "120";
+  range.dispatch("input");
+  assert.deepEqual(JSON.parse(global.localStorage.getItem("gomoku-settings-v1")), { difficulty: "easy", zoom: 120 });
+
+  setDiff("hard");
+  range.value = "100";
+  range.dispatch("input");
+});
+
 test("app 新局：清空棋子、隱藏浮層", () => {
   DOM.getElementById("btn-new").dispatch("click");
   assert.equal(stones.textContent, "0 / 225");
@@ -214,6 +226,13 @@ test("app 勝負浮層：finish() 設定狀態與浮層", () => {
   assert.equal(g.winner, G.BLACK);
   API.finish();
   assert.equal(status.textContent, "黑棋勝");
+  assert.equal(typeof API.share, "function", "公開分享功能已掛上 window");
+  assert.equal(typeof API.captureShare, "function", "分享圖片產生功能已掛上 window");
+  assert.equal(DOM.getElementById("ov-share").events.click.length, 1, "結果看板已綁定分享按鈕");
+  var shareCanvas = API.captureShare();
+  assert.ok(shareCanvas.height > shareCanvas.width, "分享圖片包含上下資訊區塊");
+  assert.ok(shareCanvas._ctx._fillTexts.includes("五子棋 · GOMOKU"), "分享圖片包含遊戲名稱");
+  assert.ok(shareCanvas._ctx._fillTexts.includes("Made with ❤️ by Will 保哥"), "分享圖片包含指定署名");
   overlay.classList.add("show");
   DOM.getElementById("ov-close").dispatch("click");
   assert.equal(overlay.classList.contains("show"), false, "X 可關閉結果浮層");

@@ -189,6 +189,8 @@ button.btn.primary{ background:linear-gradient(180deg,var(--accent),#e85f40); bo
 .card .emoji{ font-size:48px; line-height:1; }
 .card h2{ margin:14px 0 4px; font-size:30px; letter-spacing:.01em; }
 .card p{ margin:0 0 26px; color:var(--ink-dim); font-size:14px; }
+.overlay-actions{ display:flex; gap:10px; justify-content:center; }
+.overlay-actions .btn{ flex:1 1 0; justify-content:center; min-width:0; }
 .card .sw{ display:inline-block; width:18px; height:18px; border-radius:50%; vertical-align:-3px; margin-right:8px;
   box-shadow:0 1px 4px rgba(0,0,0,.5); }
 
