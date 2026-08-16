@@ -591,14 +591,23 @@
   function closeOverlay() {
       hideOverlay();
       if (view && view.showMoveNumbers) view.showMoveNumbers();
+      scheduleResultActions();
        }
 
   var overlayMessageTimer = null;
+  var resultPromptTimer = null;
   function isMobileLayout() { return window.innerWidth <= 760; }
+
+  function clearResultPromptTimer() {
+      if (resultPromptTimer) clearTimeout(resultPromptTimer);
+      resultPromptTimer = null;
+       }
 
   function resetOverlayMessage() {
       if (overlayMessageTimer) clearTimeout(overlayMessageTimer);
       overlayMessageTimer = null;
+      clearResultPromptTimer();
+      els.turn.classList.remove("result-prompt");
       els.overlay.classList.remove("message-closed");
        }
 
@@ -607,6 +616,21 @@
       if (overlayMessageTimer) clearTimeout(overlayMessageTimer);
       overlayMessageTimer = null;
       els.overlay.classList.add("message-closed");
+       }
+
+  function showResultActions() {
+      if (!isMobileLayout() || !game.isOver()) return;
+      clearResultPromptTimer();
+      els.turn.classList.remove("result-prompt");
+      els.overlay.classList.add("show");
+      els.overlay.classList.add("message-closed");
+       }
+
+  function scheduleResultActions() {
+      clearResultPromptTimer();
+      if (!isMobileLayout() || !game.isOver()) return;
+      els.turn.classList.add("result-prompt");
+      resultPromptTimer = setTimeout(showResultActions, 3000);
        }
 
   function showOverlay() {
@@ -923,6 +947,10 @@
         if (!isMobileLayout() || !e || !e.target || typeof e.target.closest !== "function") return;
         if (e.target.closest("button")) return;
         closeOverlayMessage();
+         });
+       els.turn.addEventListener("click", function () {
+        if (!isMobileLayout() || !game.isOver() || resultPromptTimer == null) return;
+        showResultActions();
          });
        els.zoomRange.addEventListener("input", function () { setZoom(els.zoomRange.value); });
        $("btn-undo").addEventListener("click", function () {
