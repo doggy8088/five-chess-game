@@ -118,7 +118,7 @@
       var THREE = window.THREE;
       var canvas = els.gl;
 
-      var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+      var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -586,21 +586,69 @@
       if (view && view.showMoveNumbers) view.showMoveNumbers();
        }
 
+  var overlayMessageTimer = null;
+  function isMobileLayout() { return window.innerWidth <= 760; }
+
+  function resetOverlayMessage() {
+      if (overlayMessageTimer) clearTimeout(overlayMessageTimer);
+      overlayMessageTimer = null;
+      els.overlay.classList.remove("message-closed");
+       }
+
+  function closeOverlayMessage() {
+      if (!isMobileLayout() || !els.overlay.classList.contains("show")) return;
+      if (overlayMessageTimer) clearTimeout(overlayMessageTimer);
+      overlayMessageTimer = null;
+      els.overlay.classList.add("message-closed");
+       }
+
+  function showOverlay() {
+      els.overlay.classList.add("show");
+      if (isMobileLayout()) overlayMessageTimer = setTimeout(closeOverlayMessage, 3000);
+       }
+
   function shareCondition() {
       var mode = game.vsAI ? "對戰 AI · 難度：" + diffName() : "雙人對戰";
       return mode + " · " + (els.ovTitle.textContent || "棋局結束") + " · 15×15 棋盤 · " + game.moves.length + " 手";
        }
 
+  function drawShareStone(c, x, y, radius, player) {
+      var gradient = player === G.BLACK
+        ? c.createRadialGradient(x - radius * 0.3, y - radius * 0.35, radius * 0.08, x, y, radius)
+        : c.createRadialGradient(x - radius * 0.3, y - radius * 0.35, radius * 0.08, x, y, radius);
+      if (player === G.BLACK) {
+        gradient.addColorStop(0, "#5a6175");
+        gradient.addColorStop(0.35, "#292d39");
+        gradient.addColorStop(1, "#10121a");
+      } else {
+        gradient.addColorStop(0, "#ffffff");
+        gradient.addColorStop(0.55, "#f3efe2");
+        gradient.addColorStop(1, "#c9c1ae");
+      }
+      c.shadowColor = "rgba(0,0,0,0.38)";
+      c.shadowBlur = Math.round(radius * 0.28);
+      c.shadowOffsetY = Math.round(radius * 0.12);
+      c.fillStyle = gradient;
+      c.beginPath();
+      c.arc(x, y, radius, 0, Math.PI * 2);
+      c.fill();
+      c.shadowBlur = 0;
+      c.shadowOffsetY = 0;
+      c.strokeStyle = player === G.BLACK ? "rgba(255,255,255,0.16)" : "rgba(75,58,36,0.22)";
+      c.lineWidth = 2;
+      c.stroke();
+       }
+
   function makeShareCanvas() {
-      var source = view && view._2d ? els.fb : els.gl;
-      var sourceWidth = source.width || Math.max(1, Math.round(window.innerWidth * (window.devicePixelRatio || 1)));
-      var sourceHeight = source.height || Math.max(1, Math.round(window.innerHeight * (window.devicePixelRatio || 1)));
-      var textScale = Math.max(0.8, Math.min(2, sourceWidth / 900));
-      var headerHeight = Math.max(92, Math.round(96 * textScale));
-      var footerHeight = Math.max(100, Math.round(112 * textScale));
+      var width = 1200;
+      var headerHeight = 220;
+      var boardSize = 1080;
+      var footerHeight = 150;
+      var boardX = (width - boardSize) / 2;
+      var boardY = headerHeight;
       var canvas = document.createElement("canvas");
-      canvas.width = sourceWidth;
-      canvas.height = headerHeight + sourceHeight + footerHeight;
+      canvas.width = width;
+      canvas.height = headerHeight + boardSize + footerHeight;
       var c = canvas.getContext("2d");
       var bg = c.createLinearGradient(0, 0, canvas.width, canvas.height);
       bg.addColorStop(0, "#0b1020");
@@ -608,27 +656,74 @@
       bg.addColorStop(1, "#090d19");
       c.fillStyle = bg;
       c.fillRect(0, 0, canvas.width, canvas.height);
-      c.fillStyle = "rgba(12, 17, 34, 0.88)";
-      c.fillRect(0, headerHeight, canvas.width, sourceHeight);
-      c.drawImage(source, 0, headerHeight, sourceWidth, sourceHeight);
+      var boardGradient = c.createLinearGradient(boardX, boardY, boardX + boardSize, boardY + boardSize);
+      boardGradient.addColorStop(0, "#e0c99a");
+      boardGradient.addColorStop(0.5, "#c4a878");
+      boardGradient.addColorStop(1, "#a8865b");
+      c.fillStyle = boardGradient;
+      c.fillRect(boardX, boardY, boardSize, boardSize);
+      c.strokeStyle = "rgba(64,43,23,0.55)";
+      c.lineWidth = 5;
+      c.strokeRect(boardX, boardY, boardSize, boardSize);
 
-      var pad = Math.round(32 * textScale);
+      var boardMargin = 82;
+      var cell = (boardSize - boardMargin * 2) / (SIZE - 1);
+      c.strokeStyle = "rgba(74,53,31,0.68)";
+      c.lineWidth = 2;
+      for (var line = 0; line < SIZE; line++) {
+        var offset = boardMargin + line * cell;
+        c.beginPath();
+        c.moveTo(boardX + boardMargin, boardY + offset);
+        c.lineTo(boardX + boardSize - boardMargin, boardY + offset);
+        c.stroke();
+        c.beginPath();
+        c.moveTo(boardX + offset, boardY + boardMargin);
+        c.lineTo(boardX + offset, boardY + boardSize - boardMargin);
+        c.stroke();
+      }
+      c.fillStyle = "#5d4429";
+      star().forEach(function (point) {
+        c.beginPath();
+        c.arc(boardX + boardMargin + point[0] * cell, boardY + boardMargin + point[1] * cell, 8, 0, Math.PI * 2);
+        c.fill();
+       });
+
+      var shareRadius = cell * 0.39;
+      game.moves.forEach(function (move) {
+        drawShareStone(c, boardX + boardMargin + move.x * cell, boardY + boardMargin + move.y * cell, shareRadius, move.player);
+       });
+      if (game.winLine && game.winLine.length) {
+        c.strokeStyle = "#ffd166";
+        c.lineWidth = 6;
+        game.winLine.forEach(function (point) {
+          c.beginPath();
+          c.arc(boardX + boardMargin + point[0] * cell, boardY + boardMargin + point[1] * cell, shareRadius + 9, 0, Math.PI * 2);
+          c.stroke();
+         });
+       }
+
+      var pad = 60;
       c.fillStyle = "#eaf0ff";
       c.textAlign = "left";
       c.textBaseline = "alphabetic";
-      c.font = "800 " + Math.round(25 * textScale) + "px PingFang TC, Noto Sans TC, sans-serif";
-      c.fillText("五子棋 · GOMOKU", pad, Math.round(38 * textScale));
+      c.font = "800 54px PingFang TC, Noto Sans TC, sans-serif";
+      c.fillText("五子棋 · GOMOKU", pad, 78);
       c.fillStyle = "#9fb0d4";
-      c.font = "600 " + Math.round(15 * textScale) + "px PingFang TC, Noto Sans TC, sans-serif";
-      c.fillText(shareCondition(), pad, Math.round(68 * textScale));
+      c.font = "600 30px PingFang TC, Noto Sans TC, sans-serif";
+      c.fillText((game.vsAI ? "對戰 AI · 難度：" + diffName() : "雙人對戰") + " · " + (els.ovTitle.textContent || "棋局結束"), pad, 132);
+      c.font = "600 28px PingFang TC, Noto Sans TC, sans-serif";
+      c.fillText("15×15 完整棋盤 · " + game.moves.length + " 手", pad, 178);
 
-      var footerTop = headerHeight + sourceHeight;
+      var footerTop = headerHeight + boardSize;
       c.fillStyle = "rgba(9, 13, 25, 0.92)";
       c.fillRect(0, footerTop, canvas.width, footerHeight);
       c.fillStyle = "#9fb0d4";
-      c.font = "600 " + Math.round(17 * textScale) + "px PingFang TC, Noto Sans TC, sans-serif";
+      c.font = "600 28px PingFang TC, Noto Sans TC, sans-serif";
+      c.textAlign = "left";
+      c.fillText("完整 15×15 棋盤結果", pad, canvas.height - 54);
+      c.font = "600 28px PingFang TC, Noto Sans TC, sans-serif";
       c.textAlign = "right";
-      c.fillText("Made with ❤️ by Will 保哥", canvas.width - pad, canvas.height - Math.round(28 * textScale));
+      c.fillText("Made with ❤️ by Will 保哥", canvas.width - pad, canvas.height - 54);
       return canvas;
        }
 
@@ -694,6 +789,7 @@
 
   function finish() {
       var w = game.winner;
+      resetOverlayMessage();
       if (view && view.hideMoveNumbers) view.hideMoveNumbers();
       if (game.vsAI) recordResult(w);   // 僅對戰 AI 時記錄（人類持黑）
       var emoji = "🏆", title = "黑棋獲勝", sub = "五子連連", color = 0xffcf5a;
@@ -707,10 +803,13 @@
       els.ovTitle.textContent = title;
       els.ovSub.textContent = sub;
       refresh();
-      setTimeout(function () { els.overlay.classList.add("show"); }, 350);
+      setTimeout(showOverlay, 350);
        }
 
-  function hideOverlay() { els.overlay.classList.remove("show"); }
+  function hideOverlay() {
+      resetOverlayMessage();
+      els.overlay.classList.remove("show");
+       }
 
   var toastTimer = null;
   function showWarning(msg) {
@@ -808,6 +907,11 @@
        els.overlayNew.addEventListener("click", newGame);
        els.overlayClose.addEventListener("click", closeOverlay);
        els.overlayShare.addEventListener("click", shareResult);
+       els.overlay.addEventListener("click", function (e) {
+        if (!isMobileLayout() || !e || !e.target || typeof e.target.closest !== "function") return;
+        if (e.target.closest("button")) return;
+        closeOverlayMessage();
+         });
        els.zoomRange.addEventListener("input", function () { setZoom(els.zoomRange.value); });
        $("btn-undo").addEventListener("click", function () {
         if (undoUsed >= undoLimit()) return;   // 已達本局撤銷上限

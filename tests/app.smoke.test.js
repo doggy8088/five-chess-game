@@ -230,7 +230,8 @@ test("app 勝負浮層：finish() 設定狀態與浮層", () => {
   assert.equal(typeof API.captureShare, "function", "分享圖片產生功能已掛上 window");
   assert.equal(DOM.getElementById("ov-share").events.click.length, 1, "結果看板已綁定分享按鈕");
   var shareCanvas = API.captureShare();
-  assert.ok(shareCanvas.height > shareCanvas.width, "分享圖片包含上下資訊區塊");
+  assert.equal(shareCanvas.width, 1200, "分享圖片使用手機友善的固定寬度");
+  assert.equal(shareCanvas.height, 1450, "分享圖片包含完整棋盤與上下資訊區塊");
   assert.ok(shareCanvas._ctx._fillTexts.includes("五子棋 · GOMOKU"), "分享圖片包含遊戲名稱");
   assert.ok(shareCanvas._ctx._fillTexts.includes("Made with ❤️ by Will 保哥"), "分享圖片包含指定署名");
   overlay.classList.add("show");
