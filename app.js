@@ -612,7 +612,7 @@
       return mode + " · " + (els.ovTitle.textContent || "棋局結束") + " · 15×15 棋盤 · " + game.moves.length + " 手";
        }
 
-  function drawShareStone(c, x, y, radius, player) {
+  function drawShareStone(c, x, y, radius, player, moveNumber) {
       var gradient = player === G.BLACK
         ? c.createRadialGradient(x - radius * 0.3, y - radius * 0.35, radius * 0.08, x, y, radius)
         : c.createRadialGradient(x - radius * 0.3, y - radius * 0.35, radius * 0.08, x, y, radius);
@@ -637,6 +637,11 @@
       c.strokeStyle = player === G.BLACK ? "rgba(255,255,255,0.16)" : "rgba(75,58,36,0.22)";
       c.lineWidth = 2;
       c.stroke();
+      c.fillStyle = player === G.BLACK ? "#f4efe2" : "#1b1d24";
+      c.font = "800 " + Math.round(radius * 0.9) + "px PingFang TC, Noto Sans TC, sans-serif";
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      c.fillText(String(moveNumber), x, y + 1);
        }
 
   function makeShareCanvas() {
@@ -689,8 +694,8 @@
        });
 
       var shareRadius = cell * 0.39;
-      game.moves.forEach(function (move) {
-        drawShareStone(c, boardX + boardMargin + move.x * cell, boardY + boardMargin + move.y * cell, shareRadius, move.player);
+      game.moves.forEach(function (move, index) {
+        drawShareStone(c, boardX + boardMargin + move.x * cell, boardY + boardMargin + move.y * cell, shareRadius, move.player, index + 1);
        });
       if (game.winLine && game.winLine.length) {
         c.strokeStyle = "#ffd166";

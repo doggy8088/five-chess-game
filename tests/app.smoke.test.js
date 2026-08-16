@@ -167,7 +167,7 @@ test("app 撤銷限制：中等最多 1 次、困難禁用、簡單無限制", a
   DOM.getElementById("btn-new").dispatch("click");
   click(FB, 7, 7, W, H);
   await sleep(330);
-  click(FB, 8, 8, W, H);
+  click(FB, 0, 0, W, H); // 避開簡單 AI 的中心附近隨機落點，避免測試碰撞
   await sleep(330);
   assert.equal(stones.textContent, "4 / 225");
   undoBtn.dispatch("click");
@@ -233,6 +233,7 @@ test("app 勝負浮層：finish() 設定狀態與浮層", () => {
   assert.equal(shareCanvas.width, 1200, "分享圖片使用手機友善的固定寬度");
   assert.equal(shareCanvas.height, 1450, "分享圖片包含完整棋盤與上下資訊區塊");
   assert.ok(shareCanvas._ctx._fillTexts.includes("五子棋 · GOMOKU"), "分享圖片包含遊戲名稱");
+  assert.ok(shareCanvas._ctx._fillTexts.includes("1"), "分享圖片包含第一手落子編號");
   assert.ok(shareCanvas._ctx._fillTexts.includes("Made with ❤️ by Will 保哥"), "分享圖片包含指定署名");
   overlay.classList.add("show");
   DOM.getElementById("ov-close").dispatch("click");
