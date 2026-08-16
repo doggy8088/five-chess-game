@@ -243,10 +243,9 @@ function () {
     var size = board.length, total = 0;
     for (var d = 0; d < DIRS.length; d++) {
       var dx = DIRS[d][0], dy = DIRS[d][1];
-      var nx = x + dx, ny = y + dy, open;
-      while (inBounds(size, nx, ny) && board[nx][ny] === who) { nx += dx; ny += dy; }
+      var nx = x + dx, ny = y + dy, open, count = 1;
+      while (inBounds(size, nx, ny) && board[nx][ny] === who) { count++; nx += dx; ny += dy; }
       open = inBounds(size, nx, ny) && board[nx][ny] === EMPTY;
-      var count = 1;
       nx = x - dx; ny = y - dy;
       while (inBounds(size, nx, ny) && board[nx][ny] === who) { count++; nx -= dx; ny -= dy; }
       var openB = inBounds(size, nx, ny) && board[nx][ny] === EMPTY;

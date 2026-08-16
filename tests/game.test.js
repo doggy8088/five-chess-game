@@ -111,6 +111,17 @@ test("evaluateCell 偵測開口型勢", () => {
   assert.ok(near > far, "貼近黑勢分數較高");
 });
 
+test("evaluateCell 對正反延伸方向給出相同評分", () => {
+  var positive = G.emptyBoard(15);
+  positive[8][5] = G.BLACK; positive[9][6] = G.BLACK; positive[10][7] = G.BLACK;
+  var negative = G.emptyBoard(15);
+  negative[4][1] = G.BLACK; negative[5][2] = G.BLACK; negative[6][3] = G.BLACK;
+  var forwardScore = G.evaluateCell(positive, 7, 4, G.BLACK, 5);
+  var backwardScore = G.evaluateCell(negative, 7, 4, G.BLACK, 5);
+  assert.equal(forwardScore, backwardScore, "鏡射後的相同活四不應因方向而改變評分");
+  assert.ok(forwardScore >= 100000, "候選點形成活四時應進入十萬級評分");
+});
+
 test("hasNeighbor 與 candidateCells", () => {
   var b = G.emptyBoard(9);
   assert.equal(G.hasNeighbor(b, 4, 4), false);
@@ -295,6 +306,24 @@ test("regression：威脅型人類再無法輕鬆贏困難 AI（困難不應弱�
       }
     }
   assert.ok(humanWins <= 1, "困難 AI 不應被威脅型人類穩壓（humanWins=" + humanWins + "/" + games + "）");
+});
+
+test("regression：困難 AI 不再重現截圖中的白棋敗局", () => {
+  // 截圖棋譜中的黑棋落點；若 AI 先占據後續攻擊點，代表已成功打斷原攻略。
+  var blackMoves = [
+    [7,7], [8,8], [7,9], [9,8], [8,10], [8,6], [9,5],
+    [9,11], [5,7], [6,7], [9,6], [10,7], [10,9], [8,5],
+    [7,4], [7,5], [6,5], [7,6], [6,6], [8,4], [9,3]
+  ];
+  var game = G.createGame({ size: 15, vsAI: true, aiPlayer: G.WHITE, difficulty: "hard" });
+  for (var i = 0; i < blackMoves.length; i++) {
+    var move = blackMoves[i];
+    if (!G.isLegalMove(game.board, move[0], move[1])) break;
+    game.place(move[0], move[1], G.BLACK);
+    if (game.isOver()) break;
+    game.aiMove();
+  }
+  assert.notEqual(game.winner, G.BLACK, "困難 AI 應打斷第 17、37、31、39、41 手的斜向五連攻略");
 });
 
 // ------------------------------------------------------------
