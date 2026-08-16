@@ -730,9 +730,10 @@
       c.font = "600 28px PingFang TC, Noto Sans TC, sans-serif";
       c.textAlign = "left";
       c.fillText("完整 15×15 棋盤結果", pad, canvas.height - 54);
-      c.font = "600 28px PingFang TC, Noto Sans TC, sans-serif";
-      c.textAlign = "right";
-      c.fillText("Made with ❤️ by Will 保哥", canvas.width - pad, canvas.height - 54);
+      var authorText = "Made with ❤️ by Will 保哥";
+      var authorRight = canvas.width - pad;
+      var authorWidth = c.measureText(authorText).width;
+      c.fillText(authorText, Math.max(pad, authorRight - authorWidth), canvas.height - 54);
       return canvas;
        }
 

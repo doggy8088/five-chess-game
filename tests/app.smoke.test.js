@@ -30,7 +30,13 @@ function makeCanvas(rect) {
     setTransform() {}, clearRect() {}, fillRect() {}, strokeRect() {},
     beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, fill() {},
     arc() {}, arcTo() {}, closePath() {},
-    fillText(text) { this._numberDraws++; this._fillTexts.push(String(text)); }, strokeText() {}, drawImage() {}, _numberDraws: 0, _fillTexts: [],
+    fillText(text, x, y) {
+      this._numberDraws++;
+      this._fillTexts.push(String(text));
+      this._fillCalls.push({ text: String(text), x: x, y: y });
+    },
+    measureText(text) { return { width: String(text).length * 16 }; },
+    strokeText() {}, drawImage() {}, _numberDraws: 0, _fillTexts: [], _fillCalls: [],
     createLinearGradient() { return this._grad; },
     createRadialGradient() { return this._grad; }
     };
@@ -299,6 +305,8 @@ test("app 勝負浮層：finish() 設定狀態與浮層", () => {
   assert.ok(shareCanvas._ctx._fillTexts.includes("五子棋 · GOMOKU"), "分享圖片包含遊戲名稱");
   assert.ok(shareCanvas._ctx._fillTexts.includes("1"), "分享圖片包含第一手落子編號");
   assert.ok(shareCanvas._ctx._fillTexts.includes("Made with ❤️ by Will 保哥"), "分享圖片包含指定署名");
+  var authorCall = shareCanvas._ctx._fillCalls.find(function (call) { return call.text === "Made with ❤️ by Will 保哥"; });
+  assert.ok(authorCall && authorCall.x < shareCanvas.width - 60, "作者資訊完整放在圖片右側內縮區域");
   overlay.classList.add("show");
   DOM.getElementById("ov-close").dispatch("click");
   assert.equal(overlay.classList.contains("show"), false, "X 可關閉結果浮層");
