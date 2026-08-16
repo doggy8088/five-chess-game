@@ -168,17 +168,18 @@ button.btn.primary{ background:linear-gradient(180deg,var(--accent),#e85f40); bo
   max-width:min(90vw,440px);
 }
 .overlay-close{
-  appearance:none; position:absolute; top:12px; right:12px;
-  width:34px; height:34px; padding:0; border-radius:50%;
+  appearance:none; position:absolute; top:14px; right:14px; z-index:2;
+  width:40px; height:40px; padding:0; border-radius:50%;
   display:inline-flex; align-items:center; justify-content:center;
-  color:var(--ink-dim); background:rgba(255,255,255,0.045);
-  border:1px solid var(--panel-border); cursor:pointer;
+  color:#fff; background:rgba(84,209,255,0.14);
+  border:1px solid rgba(84,209,255,0.58); cursor:pointer;
+  box-shadow:0 8px 20px rgba(0,0,0,0.25);
   transition:transform .12s ease, color .18s ease, background .18s ease, border-color .18s ease;
 }
-.overlay-close:hover{ color:var(--ink); background:rgba(255,255,255,0.12); border-color:rgba(140,160,220,.4); transform:scale(1.06); }
+.overlay-close:hover{ color:#0b1020; background:var(--accent-2); border-color:transparent; transform:scale(1.06); }
 .overlay-close:active{ transform:scale(.96); }
 .overlay-close:focus-visible{ outline:2px solid var(--accent-2); outline-offset:3px; }
-.overlay-close .ico{ width:17px; height:17px; display:inline-block; }
+.overlay-close .ico{ width:20px; height:20px; display:inline-block; }
 .card .emoji{ font-size:48px; line-height:1; }
 .card h2{ margin:14px 0 4px; font-size:30px; letter-spacing:.01em; }
 .card p{ margin:0 0 26px; color:var(--ink-dim); font-size:14px; }

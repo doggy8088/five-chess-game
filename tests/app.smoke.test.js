@@ -29,11 +29,13 @@ function makeCanvas(rect) {
     _grad: { addColorStop() {} },
     setTransform() {}, clearRect() {}, fillRect() {}, strokeRect() {},
     beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, fill() {},
-    arc() {}, arcTo() {}, closePath() {}, fillText() {}, strokeText() {},
+    arc() {}, arcTo() {}, closePath() {},
+    fillText() { this._numberDraws++; }, strokeText() {}, _numberDraws: 0,
     createLinearGradient() { return this._grad; },
     createRadialGradient() { return this._grad; }
     };
   c.getContext = function () { return ctx; };
+  c._ctx = ctx;
   return c;
 }
 
@@ -203,6 +205,25 @@ test("app 勝負浮層：finish() 設定狀態與浮層", () => {
   overlay.classList.add("show");
   DOM.getElementById("ov-close").dispatch("click");
   assert.equal(overlay.classList.contains("show"), false, "X 可關閉結果浮層");
+});
+
+test("app 落子編號：關閉結果浮層後才顯示", () => {
+  var API = global.window.GomokuApp;
+  API.newGame();
+  if (API.game.vsAI) DOM.getElementById("btn-mode").dispatch("click");
+  var before = FB._ctx._numberDraws;
+  click(FB, 7, 7, W, H);
+  click(FB, 8, 8, W, H);
+  assert.equal(FB._ctx._numberDraws, before, "對局進行中不繪製編號");
+
+  var g = API.game;
+  g.place(1, 1, G.BLACK); g.place(2, 1, G.BLACK); g.place(3, 1, G.BLACK);
+  g.place(4, 1, G.BLACK); g.place(5, 1, G.BLACK);
+  assert.equal(g.winner, G.BLACK);
+  API.finish();
+  overlay.classList.add("show");
+  DOM.getElementById("ov-close").dispatch("click");
+  assert.ok(FB._ctx._numberDraws > before, "關閉結果浮層後繪製編號");
 });
 
 // 勝率／連勝統計：對戰 AI 勝局記錄、悔棋還原（需放在最後，統計為全域狀態）

@@ -124,7 +124,9 @@
       group.add(top);
 
       var stones = new THREE.Group(); group.add(stones);
-      var labels = new THREE.Group(); group.add(labels);   // 落子順序編號
+      var labels = new THREE.Group();
+      labels.visible = false;
+      group.add(labels);   // 落子順序編號
       var marks = new THREE.Group(); group.add(marks);     // 勝局高亮
 
         // 最後一手標記（紅環）
@@ -173,9 +175,11 @@
         c.font = "800 " + size + "px Arial, sans-serif";
         c.textAlign = "center";
         c.textBaseline = "middle";
-        c.lineWidth = 7;
-        c.strokeStyle = player === G.BLACK ? "rgba(0,0,0,0.72)" : "rgba(255,255,255,0.88)";
-        c.strokeText(String(moveNumber), 64, 66);
+        if (player === G.BLACK) {
+          c.lineWidth = 7;
+          c.strokeStyle = "rgba(0,0,0,0.72)";
+          c.strokeText(String(moveNumber), 64, 66);
+        }
         c.fillStyle = player === G.BLACK ? "#f5f7ff" : "#182033";
         c.fillText(String(moveNumber), 64, 66);
         return new THREE.CanvasTexture(cv);
@@ -309,7 +313,9 @@
         markLast: function (gx, gy) { setLast(gx, gy); },
         markWin: function (cells, color) { clearWinRings(); color = color || 0xffcf5a; cells.forEach(function (c) { addWinRing(c[0], c[1], color); }); },
         clearMarks: function () { clearWinRings(); lastMarker.visible = false; },
-        reset: function () { clearGroup(stones); clearGroup(labels); clearGroup(marks); lastMarker.visible = false; animators.length = 0; },
+        showMoveNumbers: function () { labels.visible = true; },
+        hideMoveNumbers: function () { labels.visible = false; },
+        reset: function () { clearGroup(stones); clearGroup(labels); clearGroup(marks); labels.visible = false; lastMarker.visible = false; animators.length = 0; },
         onPick: function (cb) { onPickCb = cb; },
         onHover: function (cb) { onHoverCb = cb; },
         resize: resize
@@ -352,7 +358,7 @@
   function make2DView() {
       var canvas = els.fb;
       var ctx = canvas.getContext("2d");
-      var st = { stones: {}, last: null, win: [], winColor: 0xffcf5a };
+      var st = { stones: {}, last: null, win: [], winColor: 0xffcf5a, showNumbers: false };
       var cell, px, py;
 
       function layout() {
@@ -394,7 +400,7 @@
            });
           // 棋子
         Object.keys(st.stones).forEach(function (key) {
-          var s = st.stones[key]; drawStone(s.x, s.y, s.player, s.moveNumber);
+          var s = st.stones[key]; drawStone(s.x, s.y, s.player, st.showNumbers ? s.moveNumber : null);
            });
           // 最後一手
         if (st.last) {
@@ -414,9 +420,11 @@
           ctx.font = "800 " + fontSize + "px Arial, sans-serif";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.lineWidth = Math.max(1, cell * 0.035);
-          ctx.strokeStyle = player === G.BLACK ? "rgba(0,0,0,0.72)" : "rgba(255,255,255,0.88)";
-          ctx.strokeText(String(moveNumber), cx, cy);
+          if (player === G.BLACK) {
+            ctx.lineWidth = Math.max(1, cell * 0.035);
+            ctx.strokeStyle = "rgba(0,0,0,0.72)";
+            ctx.strokeText(String(moveNumber), cx, cy);
+          }
           ctx.fillStyle = player === G.BLACK ? "#f5f7ff" : "#182033";
           ctx.fillText(String(moveNumber), cx, cy);
            }
@@ -451,7 +459,9 @@
         markLast: function (gx, gy) { st.last = { x: gx, y: gy }; draw(); },
         markWin: function (cells, color) { st.win = cells; st.winColor = color || 0xffcf5a; draw(); },
         clearMarks: function () { st.win = []; st.last = null; draw(); },
-        reset: function () { st.stones = {}; st.last = null; st.win = []; draw(); },
+        showMoveNumbers: function () { st.showNumbers = true; draw(); },
+        hideMoveNumbers: function () { st.showNumbers = false; draw(); },
+        reset: function () { st.stones = {}; st.last = null; st.win = []; st.showNumbers = false; draw(); },
         onPick: function (cb) { onPickCb = cb; },
         onHover: function () { },
         resize: resize
@@ -530,8 +540,14 @@
       refresh();
        }
 
+  function closeOverlay() {
+      hideOverlay();
+      if (view && view.showMoveNumbers) view.showMoveNumbers();
+       }
+
   function finish() {
       var w = game.winner;
+      if (view && view.hideMoveNumbers) view.hideMoveNumbers();
       if (game.vsAI) recordResult(w);   // 僅對戰 AI 時記錄（人類持黑）
       var emoji = "🏆", title = "黑棋獲勝", sub = "五子連連", color = 0xffcf5a;
       if (w === G.WHITE) { title = "白棋獲勝"; emoji = "⚪"; }
@@ -628,7 +644,7 @@
          });
        $("btn-new").addEventListener("click", newGame);
        els.overlayNew.addEventListener("click", newGame);
-       els.overlayClose.addEventListener("click", hideOverlay);
+       els.overlayClose.addEventListener("click", closeOverlay);
        $("btn-undo").addEventListener("click", function () {
         if (undoUsed >= undoLimit()) return;   // 已達本局撤銷上限
         var wasOver = game.isOver();
