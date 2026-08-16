@@ -29,7 +29,7 @@
      sWinrate: $("s-winrate"), sStreak: $("s-streak"), sStatus: $("s-status"), sMode: $("s-mode"),
      hint: $("hint"),
      toast: $("toast"),
-     overlay: $("overlay"), ovEmoji: $("ov-emoji"), ovTitle: $("ov-title"), ovSub: $("ov-sub"),
+     overlay: $("overlay"), overlayClose: $("ov-close"), ovEmoji: $("ov-emoji"), ovTitle: $("ov-title"), ovSub: $("ov-sub"),
      overlayNew: $("ov-new"), modeLabel: $("mode-label"),
      dock: $("dock"), dockClose: $("dock-close"), dockOpen: $("dock-open")
      };
@@ -124,6 +124,7 @@
       group.add(top);
 
       var stones = new THREE.Group(); group.add(stones);
+      var labels = new THREE.Group(); group.add(labels);   // 落子順序編號
       var marks = new THREE.Group(); group.add(marks);     // 勝局高亮
 
         // 最後一手標記（紅環）
@@ -161,17 +162,51 @@
       var blackMat = new THREE.MeshStandardMaterial({ color: 0x1b1d24, roughness: 0.3, metalness: 0.25 });
       var whiteMat = new THREE.MeshStandardMaterial({ color: 0xf3efe2, roughness: 0.42, metalness: 0.06 });
       var stoneGeo = new THREE.CylinderGeometry(STONE_R, STONE_R * 0.92, STONE_H, 48);
+      var labelGeo = new THREE.PlaneGeometry(STONE_R * 1.28, STONE_R * 1.28);
+
+      function makeStoneNumberTexture(moveNumber, player) {
+        var cv = document.createElement("canvas");
+        cv.width = cv.height = 128;
+        var c = cv.getContext("2d");
+        var size = moveNumber >= 100 ? 44 : moveNumber >= 10 ? 58 : 72;
+        c.clearRect(0, 0, 128, 128);
+        c.font = "800 " + size + "px Arial, sans-serif";
+        c.textAlign = "center";
+        c.textBaseline = "middle";
+        c.lineWidth = 7;
+        c.strokeStyle = player === G.BLACK ? "rgba(0,0,0,0.72)" : "rgba(255,255,255,0.88)";
+        c.strokeText(String(moveNumber), 64, 66);
+        c.fillStyle = player === G.BLACK ? "#f5f7ff" : "#182033";
+        c.fillText(String(moveNumber), 64, 66);
+        return new THREE.CanvasTexture(cv);
+         }
 
       var animators = [];
-      function addStone(gx, gy, player, instant) {
+      function addStone(gx, gy, player, moveNumber, instant) {
+        if (moveNumber == null) moveNumber = stones.children.length + 1;
         var m = new THREE.Mesh(stoneGeo, player === G.BLACK ? blackMat : whiteMat);
-        m.position.set(wx(gx), STONE_H / 2 + 0.011, wz(gy));
+        var targetY = STONE_H / 2 + 0.011;
+        m.position.set(wx(gx), targetY, wz(gy));
         m.castShadow = true; m.receiveShadow = true;
         stones.add(m);
+
+        var label = new THREE.Mesh(labelGeo, new THREE.MeshBasicMaterial({
+          map: makeStoneNumberTexture(moveNumber, player),
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide
+        }));
+        label.position.set(wx(gx), STONE_H + 0.07, wz(gy));
+        label.rotation.x = -Math.PI / 2;
+        label.renderOrder = 3;
+        labels.add(label);
         if (instant) return m;
+
         m.position.y = 6;
-        m.userData = { startY: 6, targetY: STONE_H / 2 + 0.011, t0: null, done: false };
-        animators.push(m);
+        m.userData = { startY: 6, targetY: targetY, t0: null, done: false };
+        label.position.y = 6;
+        label.userData = { startY: 6, targetY: STONE_H + 0.07, t0: null, done: false };
+        animators.push(m, label);
         return m;
          }
       function clearGroup(g) { while (g.children.length) g.remove(g.children[0]); }
@@ -270,11 +305,11 @@
 
       return {
         _3d: true,
-        place: function (gx, gy, player, instant) { addStone(gx, gy, player, instant); },
+        place: function (gx, gy, player, moveNumber, instant) { addStone(gx, gy, player, moveNumber, instant); },
         markLast: function (gx, gy) { setLast(gx, gy); },
         markWin: function (cells, color) { clearWinRings(); color = color || 0xffcf5a; cells.forEach(function (c) { addWinRing(c[0], c[1], color); }); },
         clearMarks: function () { clearWinRings(); lastMarker.visible = false; },
-        reset: function () { clearGroup(stones); clearGroup(marks); lastMarker.visible = false; animators.length = 0; },
+        reset: function () { clearGroup(stones); clearGroup(labels); clearGroup(marks); lastMarker.visible = false; animators.length = 0; },
         onPick: function (cb) { onPickCb = cb; },
         onHover: function (cb) { onHoverCb = cb; },
         resize: resize
@@ -359,7 +394,7 @@
            });
           // 棋子
         Object.keys(st.stones).forEach(function (key) {
-          var s = st.stones[key]; drawStone(s.x, s.y, s.player);
+          var s = st.stones[key]; drawStone(s.x, s.y, s.player, s.moveNumber);
            });
           // 最後一手
         if (st.last) {
@@ -367,13 +402,24 @@
           ctx.beginPath(); ctx.arc(X(st.last.x), Y(st.last.y), cell * 0.16, 0, 7); ctx.stroke();
            }
          }
-      function drawStone(gx, gy, player) {
+      function drawStone(gx, gy, player, moveNumber) {
         var r = cell * 0.42, cx = X(gx), cy = Y(gy);
         var g = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.15, cx, cy, r);
         if (player === G.BLACK) { g.addColorStop(0, "#5a6072"); g.addColorStop(0.5, "#20232b"); g.addColorStop(1, "#0c0d12"); }
         else { g.addColorStop(0, "#ffffff"); g.addColorStop(0.6, "#eee7d5"); g.addColorStop(1, "#c9c2b0"); }
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill();
         if (player === G.WHITE) { ctx.strokeStyle = "rgba(120,110,90,0.45)"; ctx.lineWidth = 1; ctx.stroke(); }
+        if (moveNumber != null) {
+          var fontSize = Math.max(8, Math.round(cell * (moveNumber >= 100 ? 0.22 : moveNumber >= 10 ? 0.28 : 0.32)));
+          ctx.font = "800 " + fontSize + "px Arial, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.lineWidth = Math.max(1, cell * 0.035);
+          ctx.strokeStyle = player === G.BLACK ? "rgba(0,0,0,0.72)" : "rgba(255,255,255,0.88)";
+          ctx.strokeText(String(moveNumber), cx, cy);
+          ctx.fillStyle = player === G.BLACK ? "#f5f7ff" : "#182033";
+          ctx.fillText(String(moveNumber), cx, cy);
+           }
          }
       function roundRect(c2, x, y, w, h, r) {
         c2.beginPath();
@@ -401,7 +447,7 @@
       resize();
       return {
         _2d: true,
-        place: function (gx, gy, player, instant) { st.stones[gx + "," + gy] = { x: gx, y: gy, player: player }; draw(); },
+        place: function (gx, gy, player, moveNumber, instant) { st.stones[gx + "," + gy] = { x: gx, y: gy, player: player, moveNumber: moveNumber }; draw(); },
         markLast: function (gx, gy) { st.last = { x: gx, y: gy }; draw(); },
         markWin: function (cells, color) { st.win = cells; st.winColor = color || 0xffcf5a; draw(); },
         clearMarks: function () { st.win = []; st.last = null; draw(); },
@@ -445,7 +491,7 @@
           }
         return;
         }
-      view.place(pos.x, pos.y, tp);
+      view.place(pos.x, pos.y, tp, game.moves.length);
       view.markLast(pos.x, pos.y);
       refresh();
       if (game.isOver()) return finish();
@@ -456,7 +502,7 @@
       locked = true; setBusy(true);
       setTimeout(function () {
         var m = game.aiMove();
-        if (m) { view.place(m.x, m.y, m.player); view.markLast(m.x, m.y); refresh(); }
+        if (m) { view.place(m.x, m.y, m.player, game.moves.length); view.markLast(m.x, m.y); refresh(); }
         locked = false; setBusy(false);
         if (game.isOver()) finish();
          }, 230);
@@ -466,7 +512,7 @@
       view.reset();
       for (var i = 0; i < game.moves.length; i++) {
         var mv = game.moves[i];
-        view.place(mv.x, mv.y, mv.player, true);
+        view.place(mv.x, mv.y, mv.player, i + 1, true);
            }
       var last = game.moves[game.moves.length - 1];
       if (last) view.markLast(last.x, last.y);
@@ -582,6 +628,7 @@
          });
        $("btn-new").addEventListener("click", newGame);
        els.overlayNew.addEventListener("click", newGame);
+       els.overlayClose.addEventListener("click", hideOverlay);
        $("btn-undo").addEventListener("click", function () {
         if (undoUsed >= undoLimit()) return;   // 已達本局撤銷上限
         var wasOver = game.isOver();

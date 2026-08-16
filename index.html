@@ -133,7 +133,10 @@
 <div id="toast" role="status" aria-live="polite"></div>
 
 <div id="overlay">
-   <div class="card">
+   <div class="card" role="dialog" aria-modal="true" aria-labelledby="ov-title" aria-describedby="ov-sub">
+     <button class="overlay-close" id="ov-close" type="button" aria-label="關閉對局結果" title="關閉對局結果">
+       <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+     </button>
      <div class="emoji" id="ov-emoji">🏆</div>
      <h2 id="ov-title">黑棋獲勝</h2>
      <p id="ov-sub">五子連連</p>

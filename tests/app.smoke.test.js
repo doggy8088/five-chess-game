@@ -29,7 +29,7 @@ function makeCanvas(rect) {
     _grad: { addColorStop() {} },
     setTransform() {}, clearRect() {}, fillRect() {}, strokeRect() {},
     beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, fill() {},
-    arc() {}, arcTo() {}, closePath() {}, fillText() {},
+    arc() {}, arcTo() {}, closePath() {}, fillText() {}, strokeText() {},
     createLinearGradient() { return this._grad; },
     createRadialGradient() { return this._grad; }
     };
@@ -200,6 +200,9 @@ test("app 勝負浮層：finish() 設定狀態與浮層", () => {
   assert.equal(g.winner, G.BLACK);
   API.finish();
   assert.equal(status.textContent, "黑棋勝");
+  overlay.classList.add("show");
+  DOM.getElementById("ov-close").dispatch("click");
+  assert.equal(overlay.classList.contains("show"), false, "X 可關閉結果浮層");
 });
 
 // 勝率／連勝統計：對戰 AI 勝局記錄、悔棋還原（需放在最後，統計為全域狀態）

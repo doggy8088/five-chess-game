@@ -110,7 +110,7 @@ function makeCanvas() {
     var ctx = {
       _grad: { addColorStop() {} },
       setTransform() {}, clearRect() {}, fillRect() {}, beginPath() {},
-      moveTo() {}, lineTo() {}, stroke() {}, fill() {}, arc() {}, arcTo() {}, closePath() {},
+      moveTo() {}, lineTo() {}, stroke() {}, fill() {}, fillText() {}, strokeText() {}, arc() {}, arcTo() {}, closePath() {},
       createLinearGradient() { return this._grad; },
       createRadialGradient() { return this._grad; }
        };

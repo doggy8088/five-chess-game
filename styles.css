@@ -161,12 +161,24 @@ button.btn.primary{ background:linear-gradient(180deg,var(--accent),#e85f40); bo
 }
 #overlay.show{ display:grid; animation:fade .35s ease; }
 .card{
-  text-align:center; padding:38px 46px; border-radius:22px;
+  position:relative; text-align:center; padding:38px 46px; border-radius:22px;
   background:linear-gradient(180deg, rgba(30,37,63,0.96), rgba(16,20,38,0.97));
   border:1px solid var(--panel-border); box-shadow:var(--shadow);
   transform:translateY(14px); animation:rise .5s cubic-bezier(.2,.8,.2,1) forwards;
   max-width:min(90vw,440px);
 }
+.overlay-close{
+  appearance:none; position:absolute; top:12px; right:12px;
+  width:34px; height:34px; padding:0; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center;
+  color:var(--ink-dim); background:rgba(255,255,255,0.045);
+  border:1px solid var(--panel-border); cursor:pointer;
+  transition:transform .12s ease, color .18s ease, background .18s ease, border-color .18s ease;
+}
+.overlay-close:hover{ color:var(--ink); background:rgba(255,255,255,0.12); border-color:rgba(140,160,220,.4); transform:scale(1.06); }
+.overlay-close:active{ transform:scale(.96); }
+.overlay-close:focus-visible{ outline:2px solid var(--accent-2); outline-offset:3px; }
+.overlay-close .ico{ width:17px; height:17px; display:inline-block; }
 .card .emoji{ font-size:48px; line-height:1; }
 .card h2{ margin:14px 0 4px; font-size:30px; letter-spacing:.01em; }
 .card p{ margin:0 0 26px; color:var(--ink-dim); font-size:14px; }
