@@ -103,44 +103,202 @@ function () {
      * 長連：黑棋連出六子以上（超過五子），不算勝，直接判禁手。
      * 先五為勝：精準五連優先於禁手（會勝即不視為禁手）；白棋不受限。
      */
-  // 在方向 (dx,dy) 上，是否存在一段「活四」（連續四子、兩端皆空）穿越 (x,y)。
-  // 呼叫前 board[x][y] 需已為 who。
-  function isOpenFourThrough(board, x, y, who, dx, dy) {
-    var size = board.length;
-    var sx = x, sy = y, px = x - dx, py = y - dy;
-    while (inBounds(size, px, py) && board[px][py] === who) { sx = px; sy = py; px -= dx; py -= dy; }
-    var cnt = 0, cx = sx, cy = sy;
-    while (inBounds(size, cx, cy) && board[cx][cy] === who) { cnt++; cx += dx; cy += dy; }
-    if (cnt !== 4) return false;
-    var bx = sx - dx, by = sy - dy;           // 起點前一格
-    var openB = inBounds(size, bx, by) && board[bx][by] === EMPTY;
-    var openA = inBounds(size, cx, cy) && board[cx][cy] === EMPTY; // 終點後一格
-    return openB && openA;
+  // 取得穿過指定交叉點的連續棋子列。呼叫前 board[x][y] 需已為 who。
+  function contiguousCellsThrough(board, x, y, who, dx, dy) {
+    var size = board.length, cells = [[x, y]], nx = x + dx, ny = y + dy;
+    while (inBounds(size, nx, ny) && board[nx][ny] === who) {
+      cells.push([nx, ny]); nx += dx; ny += dy;
+      }
+    nx = x - dx; ny = y - dy;
+    while (inBounds(size, nx, ny) && board[nx][ny] === who) {
+      cells.unshift([nx, ny]); nx -= dx; ny -= dy;
+      }
+    return cells;
    }
 
-    // 在方向 (dx,dy) 上，(x,y) 落子後是否形成活三（再加一手可成活四）。
-    // 呼叫前 board[x][y] 需已為 who。
-  function isOpenThree(board, x, y, who, dx, dy) {
-    var size = board.length;
-    for (var k = -4; k <= 4; k++) {
-      if (k === 0) continue;
-      var ex = x + dx * k, ey = y + dy * k;
-      if (!inBounds(size, ex, ey) || board[ex][ey] !== EMPTY) continue;
-      board[ex][ey] = who;
-      var hit = isOpenFourThrough(board, x, y, who, dx, dy);
-      board[ex][ey] = EMPTY;
-      if (hit) return true;
+  function containsCell(cells, x, y) {
+    for (var i = 0; i < cells.length; i++) {
+      if (cells[i][0] === x && cells[i][1] === y) return true;
       }
     return false;
    }
 
-    // (x,y) 落子後是否同時形成兩個以上的活三。呼叫前 board[x][y] 需已為 who。
-  function isDoubleOpenThree(board, x, y, who) {
-    var count = 0;
-    for (var d = 0; d < DIRS.length; d++) {
-      if (isOpenThree(board, x, y, who, DIRS[d][0], DIRS[d][1])) count++;
+  // 直四的兩個成五點都必須真的能形成精準五連；靠近邊界、被阻擋或會變長連
+  // 的表面四，不能當成 RIF 定義中的 Straight Four。
+  function straightFourCompletions(board, cells, who, dx, dy, min) {
+    var size = board.length, first = cells[0], last = cells[cells.length - 1];
+    var candidates = [
+      [first[0] - dx, first[1] - dy],
+      [last[0] + dx, last[1] + dy]
+    ];
+    var out = [];
+    for (var i = 0; i < candidates.length; i++) {
+      var p = candidates[i];
+      if (!inBounds(size, p[0], p[1]) || board[p[0]][p[1]] !== EMPTY) continue;
+      board[p[0]][p[1]] = who;
+      var exact = countLine(board, p[0], p[1], who, dx, dy) === min;
+      board[p[0]][p[1]] = EMPTY;
+      if (exact) out.push(p);
       }
-    return count >= 2;
+    return out;
+   }
+
+  function renjuContext() {
+    return { forbiddenDoubleThree: Object.create(null), active: Object.create(null) };
+   }
+
+  function boardStateKey(board) {
+    var rows = [];
+    for (var i = 0; i < board.length; i++) rows.push(board[i].join(""));
+    return board.length + ":" + rows.join("/");
+   }
+
+  // 在方向 (dx,dy) 上，是否存在真正的 Straight Four 穿過 (x,y)。
+  // 呼叫前 board[x][y] 需已為 who。
+  function isOpenFourThrough(board, x, y, who, dx, dy) {
+    var min = 5;
+    var cells = contiguousCellsThrough(board, x, y, who, dx, dy);
+    if (cells.length !== min - 1) return false;
+    return straightFourCompletions(board, cells, who, dx, dy, min).length >= 2;
+   }
+
+    // 找出這一手在單一方向形成的所有「四」。四不只限於連四，也包含可補成五的跳四；
+    // 以四顆既有棋子的集合去重，避免活四的兩個成五點被重複計算。
+  function fourStructuresInDirection(board, x, y, who, dx, dy, min) {
+    var size = board.length, out = [], seen = Object.create(null);
+    for (var k = -(min - 1); k <= min - 1; k++) {
+      if (k === 0) continue;
+      var ex = x + dx * k, ey = y + dy * k;
+      if (!inBounds(size, ex, ey) || board[ex][ey] !== EMPTY) continue;
+      board[ex][ey] = who;
+      if (countLine(board, ex, ey, who, dx, dy) === min) {
+        var line = contiguousCellsThrough(board, ex, ey, who, dx, dy);
+        if (containsCell(line, x, y)) {
+          var four = [];
+          for (var i = 0; i < line.length; i++) {
+            if (line[i][0] !== ex || line[i][1] !== ey) four.push(line[i]);
+            }
+          var key = four.map(function (p) { return p[0] + "," + p[1]; }).join(";");
+          if (!seen[key]) {
+            seen[key] = true;
+            out.push({ cells: four, completion: [ex, ey] });
+            }
+          }
+        }
+      board[ex][ey] = EMPTY;
+      }
+    return out;
+   }
+
+  function fourStructures(board, x, y, who, min) {
+    var out = [];
+    for (var d = 0; d < DIRS.length; d++) {
+      var found = fourStructuresInDirection(board, x, y, who, DIRS[d][0], DIRS[d][1], min);
+      for (var i = 0; i < found.length; i++) out.push(found[i]);
+      }
+    return out;
+   }
+
+    // 找出由 (x,y) 形成的 Three。關鍵是補四的那一子必須位於該四顆連續棋子中；
+    // 因此已經存在的四，不會因為在同方向遠處再放一子而被錯算成 Three。
+  function threeStructuresInDirection(board, x, y, who, dx, dy, min) {
+    var size = board.length, out = [], seen = Object.create(null);
+    for (var k = -(min - 1); k <= min - 1; k++) {
+      if (k === 0) continue;
+      var ex = x + dx * k, ey = y + dy * k;
+      if (!inBounds(size, ex, ey) || board[ex][ey] !== EMPTY) continue;
+      board[ex][ey] = who;
+      var line = contiguousCellsThrough(board, ex, ey, who, dx, dy);
+      var isThree = line.length === min - 1 && containsCell(line, x, y);
+      var straight = isThree && straightFourCompletions(board, line, who, dx, dy, min).length >= 2;
+      // RIF §3 的 Three 不能以同一手同時形成五連。
+      if (straight && !isFive(board, ex, ey, who, min)) {
+        var three = [];
+        for (var i = 0; i < line.length; i++) {
+          if (line[i][0] !== ex || line[i][1] !== ey) three.push(line[i]);
+          }
+        var key = dx + "," + dy + ":" + three.map(function (p) { return p[0] + "," + p[1]; }).join(";");
+        if (!seen[key]) {
+          seen[key] = { cells: three, extensions: [] };
+          out.push(seen[key]);
+          }
+        seen[key].extensions.push([ex, ey]);
+        }
+      board[ex][ey] = EMPTY;
+      }
+    return out;
+   }
+
+  function threeStructures(board, x, y, who, min) {
+    var out = [];
+    for (var d = 0; d < DIRS.length; d++) {
+      var found = threeStructuresInDirection(board, x, y, who, DIRS[d][0], DIRS[d][1], min);
+      for (var i = 0; i < found.length; i++) out.push(found[i]);
+      }
+    return out;
+   }
+
+  function forbiddenDoubleThreePlaced(board, x, y, who, min, context) {
+    if (who !== BLACK) return false;
+    min = min || 5;
+    if (isFive(board, x, y, who, min)) return false;
+    if (isOverline(board, x, y, who, min)) return true;
+    if (isDoubleFour(board, x, y, who, min)) return true;
+    context = context || renjuContext();
+    var key = boardStateKey(board) + "|" + x + "," + y + "|" + min;
+    if (Object.prototype.hasOwnProperty.call(context.forbiddenDoubleThree, key)) {
+      return context.forbiddenDoubleThree[key];
+      }
+    // 每次遞迴都多放一子，理論上不會循環；active 仍保留作為防護。
+    if (context.active[key]) return false;
+    context.active[key] = true;
+    var threes = threeStructures(board, x, y, who, min), safeCount = 0;
+    for (var i = 0; i < threes.length; i++) {
+      if (hasAllowedThreeExtension(board, threes[i], who, min, context)) safeCount++;
+      }
+    var forbidden = threes.length > 1 && safeCount > 1;
+    delete context.active[key];
+    context.forbiddenDoubleThree[key] = forbidden;
+    return forbidden;
+   }
+
+  function hasAllowedThreeExtension(board, three, who, min, context) {
+    for (var i = 0; i < three.extensions.length; i++) {
+      var p = three.extensions[i];
+      board[p[0]][p[1]] = who;
+      var allowed = true;
+      if (who === BLACK) {
+        allowed = !isOverline(board, p[0], p[1], who, min) &&
+          !isDoubleFour(board, p[0], p[1], who, min) &&
+          !forbiddenDoubleThreePlaced(board, p[0], p[1], who, min, context);
+        }
+      board[p[0]][p[1]] = EMPTY;
+      if (allowed) return true;
+      }
+    return false;
+   }
+
+    // 在方向 (dx,dy) 上，(x,y) 落子後是否形成可合法發展的 Three。
+    // 呼叫前 board[x][y] 需已為 who。
+  function isOpenThree(board, x, y, who, dx, dy) {
+    var min = 5, found = threeStructuresInDirection(board, x, y, who, dx, dy, min);
+    var context = renjuContext();
+    for (var i = 0; i < found.length; i++) {
+      if (hasAllowedThreeExtension(board, found[i], who, min, context)) return true;
+      }
+    return false;
+   }
+
+    // (x,y) 落子後是否形成 RIF 意義下的禁手雙三。這裡不只數表面棋型，還會
+    // 依 §9.3 檢查每個 Three 的合法 Straight Four 延伸，並遞迴檢查延伸所形成的雙三。
+  function isDoubleOpenThree(board, x, y, who) {
+    var min = 5, threes = threeStructures(board, x, y, who, min);
+    if (threes.length < 2) return false;
+    var context = renjuContext(), safeCount = 0;
+    for (var i = 0; i < threes.length; i++) {
+      if (hasAllowedThreeExtension(board, threes[i], who, min, context)) safeCount++;
+      }
+    return safeCount > 1;
    }
 
     /* ---- 長連與精準五連 ---- */
@@ -170,28 +328,16 @@ function () {
   function isFiveThrough(board, x, y, who, dx, dy, min) {
     return countLine(board, x, y, who, dx, dy) === (min || 5);
    }
-    // 在方向 (dx,dy) 上，(x,y) 落子後是否形成「四」（再加一手可成精準五連）。
+    // 在方向 (dx,dy) 上，(x,y) 落子後是否形成至少一個「四」（含跳四）。
     // 呼叫前 board[x][y] 需已為 who。
   function isFourThrough(board, x, y, who, dx, dy, min) {
-    var size = board.length;
-    for (var k = -4; k <= 4; k++) {
-      if (k === 0) continue;
-      var ex = x + dx * k, ey = y + dy * k;
-      if (!inBounds(size, ex, ey) || board[ex][ey] !== EMPTY) continue;
-      board[ex][ey] = who;
-      var hit = isFiveThrough(board, x, y, who, dx, dy, min);
-      board[ex][ey] = EMPTY;
-      if (hit) return true;
-      }
-    return false;
+    min = min || 5;
+    return fourStructuresInDirection(board, x, y, who, dx, dy, min).length > 0;
    }
     // (x,y) 落子後是否同時形成兩個以上的四。呼叫前 board[x][y] 需已為 who。
   function isDoubleFour(board, x, y, who, min) {
-    var count = 0;
-    for (var d = 0; d < DIRS.length; d++) {
-      if (isFourThrough(board, x, y, who, DIRS[d][0], DIRS[d][1], min)) count++;
-      }
-    return count >= 2;
+    min = min || 5;
+    return fourStructures(board, x, y, who, min).length >= 2;
    }
 
     /* ---- 禁手判定（彙整）---- */
@@ -204,7 +350,7 @@ function () {
     if (isFive(board, x, y, who, min)) return null;            // 先五為勝，不計禁手
     if (isOverline(board, x, y, who, min)) return "overline";
     if (isDoubleFour(board, x, y, who, min)) return "doubleFour";
-    if (isDoubleOpenThree(board, x, y, who)) return "doubleThree";
+    if (forbiddenDoubleThreePlaced(board, x, y, who, min, renjuContext())) return "doubleThree";
     return null;
    }
     // 在 (x,y) 落 who 子是否構成禁手（會勝不算禁手；白棋永不禁手）。

@@ -671,6 +671,61 @@ test("isForbiddenMove：黑棋雙活三為禁手，五連勝利優先", () => {
   assert.equal(G.isForbiddenMove(G.emptyBoard(15), 7, 7, G.BLACK, 5), false, "孤立一手非禁手");
 });
 
+test("regression：四三不得把已完成的四重複計為三三", () => {
+  var b = G.emptyBoard(15);
+  // 落在 (7,7) 後，橫向形成四、縱向形成三，是合法四三。
+  b[7][8] = G.BLACK; b[7][9] = G.BLACK; b[7][10] = G.BLACK;
+  b[8][7] = G.BLACK; b[9][7] = G.BLACK;
+
+  b[7][7] = G.BLACK;
+  assert.equal(G.isOpenThree(b, 7, 7, G.BLACK, 0, 1), false, "已完成的四不是 Three");
+  assert.equal(G.isOpenThree(b, 7, 7, G.BLACK, 1, 0), true, "縱向才是有效 Three");
+  b[7][7] = G.EMPTY;
+  assert.equal(G.forbiddenReason(b, 7, 7, G.BLACK, 5), null, "四三不是三三禁手");
+
+  var game = G.createGame({ vsAI: false, difficulty: "hard" });
+  game.board = G.cloneBoard(b);
+  assert.equal(game.place(7, 7, G.BLACK), true, "困難模式應接受合法四三");
+  assert.equal(game.winner, null, "合法四三不應直接判黑棋輸");
+  assert.equal(game.forbidden, false, "合法四三不應觸發禁手狀態");
+});
+
+test("RIF Three 會排除邊界、白棋阻擋、長連與四四造成的非法延伸", () => {
+  var edge = G.emptyBoard(15);
+  edge[0][1] = G.BLACK; edge[0][2] = G.BLACK; edge[0][0] = G.BLACK;
+  assert.equal(G.isOpenThree(edge, 0, 0, G.BLACK, 0, 1), false, "棋盤邊界只剩一個成直四方式");
+
+  var blocked = G.emptyBoard(15);
+  blocked[7][6] = G.WHITE; blocked[7][8] = G.BLACK; blocked[7][9] = G.BLACK; blocked[7][7] = G.BLACK;
+  assert.equal(G.isOpenThree(blocked, 7, 7, G.BLACK, 0, 1), false, "白棋阻擋後不是有效 Three");
+
+  var overline = G.emptyBoard(15);
+  overline[7][5] = G.WHITE; overline[7][8] = G.BLACK; overline[7][9] = G.BLACK; overline[7][7] = G.BLACK;
+  for (var y = 2; y <= 6; y++) overline[y][10] = G.BLACK;
+  assert.equal(G.isOpenThree(overline, 7, 7, G.BLACK, 0, 1), false, "唯一延伸會形成長連");
+
+  var doubleFour = G.emptyBoard(15);
+  doubleFour[7][5] = G.WHITE; doubleFour[7][8] = G.BLACK; doubleFour[7][9] = G.BLACK; doubleFour[7][7] = G.BLACK;
+  doubleFour[8][10] = G.BLACK; doubleFour[9][10] = G.BLACK; doubleFour[10][10] = G.BLACK;
+  assert.equal(G.isOpenThree(doubleFour, 7, 7, G.BLACK, 0, 1), false, "唯一延伸會形成四四");
+});
+
+test("RIF §9.3：延伸所形成的禁手三三不會阻塞合法的雙三判定", () => {
+  var b = G.emptyBoard(15);
+  [[6, 0], [6, 1], [7, 0], [7, 2], [7, 5], [8, 1], [8, 5], [9, 1],
+    [10, 3], [10, 4], [11, 1], [11, 7], [12, 2], [12, 4], [13, 2],
+    [13, 6], [13, 7], [14, 3]].forEach(function (p) { b[p[0]][p[1]] = G.BLACK; });
+  [[8, 4], [11, 6], [12, 0], [13, 1]].forEach(function (p) { b[p[0]][p[1]] = G.WHITE; });
+
+  // (11,2) 形成兩個表面 Three；其中一個只能延伸到 (10,2)，
+  // 而該延伸本身形成禁手三三，因此依 §9.3(b) 原手允許。
+  assert.equal(G.forbiddenReason(b, 11, 2, G.BLACK, 5), null, "遞迴例外下雙三允許");
+  b[11][2] = G.BLACK;
+  assert.equal(G.isDoubleOpenThree(b, 11, 2, G.BLACK), false, "遞迴例外不是禁手雙三");
+  b[10][2] = G.BLACK;
+  assert.equal(G.forbiddenReasonPlaced(b, 10, 2, G.BLACK, 5, "renju"), "doubleThree", "延伸點本身是禁手三三");
+});
+
 test("place 黑棋雙活三：首犯退回、再犯判負", () => {
   var g = G.createGame({ vsAI: false });
   g.place(7, 5, G.BLACK); g.place(0, 0, G.WHITE);

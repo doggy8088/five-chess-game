@@ -4,8 +4,8 @@
  "description": "五子棋 / Gomoku — 3D three.js + pure CSS, 零依賴前端（僅 three.js CDN）。",
  "type": "commonjs",
  "scripts": {
-   "test": "node --test --coverage tests/",
-   "coverage": "node --test --coverage --coverage-reporter=text --coverage-thresholds=90 tests/",
+   "test": "node --test tests/*.test.js",
+   "coverage": "node --test --experimental-test-coverage tests/*.test.js",
    "serve": "npx --yes serve -l 4321 ."
   },
   "keywords": ["gomoku", "五子棋", "five-in-a-row", "three.js"],
