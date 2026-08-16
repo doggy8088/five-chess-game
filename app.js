@@ -8,7 +8,8 @@
      var G = window.Game;
      if (!G) { console.error("[五子棋] game.js 尚未載入"); return; }
 
-   var SIZE = 15;
+     var SIZE = 15;
+     var ZOOM_MIN = 70, ZOOM_MAX = 130, DEFAULT_ZOOM = 100;
     var difficulty = "hard";   // easy | medium | hard
     var vsAI = true;
     var game = G.createGame({ size: SIZE, vsAI: vsAI, aiPlayer: G.WHITE, difficulty: difficulty });
@@ -30,6 +31,7 @@
      hint: $("hint"),
      toast: $("toast"),
      overlay: $("overlay"), overlayClose: $("ov-close"), ovEmoji: $("ov-emoji"), ovTitle: $("ov-title"), ovSub: $("ov-sub"),
+     zoomRange: $("zoom-range"), zoomValue: $("zoom-value"),
      overlayNew: $("ov-new"), modeLabel: $("mode-label"),
      dock: $("dock"), dockClose: $("dock-close"), dockOpen: $("dock-open")
      };
@@ -159,6 +161,10 @@
           orbit.radius * cp + 0.6,
           orbit.radius * sp * Math.cos(orbit.theta));
         camera.lookAt(0, 0.2, 0);
+         }
+      function setZoom(percent) {
+        var zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Number(percent) || DEFAULT_ZOOM));
+        orbit.radius = 15 * DEFAULT_ZOOM / zoom;
          }
 
       var blackMat = new THREE.MeshStandardMaterial({ color: 0x1b1d24, roughness: 0.3, metalness: 0.25 });
@@ -315,6 +321,7 @@
         clearMarks: function () { clearWinRings(); lastMarker.visible = false; },
         showMoveNumbers: function () { labels.visible = true; },
         hideMoveNumbers: function () { labels.visible = false; },
+        setZoom: setZoom,
         reset: function () { clearGroup(stones); clearGroup(labels); clearGroup(marks); labels.visible = false; lastMarker.visible = false; animators.length = 0; },
         onPick: function (cb) { onPickCb = cb; },
         onHover: function (cb) { onHoverCb = cb; },
@@ -358,7 +365,7 @@
   function make2DView() {
       var canvas = els.fb;
       var ctx = canvas.getContext("2d");
-      var st = { stones: {}, last: null, win: [], winColor: 0xffcf5a, showNumbers: false };
+      var st = { stones: {}, last: null, win: [], winColor: 0xffcf5a, showNumbers: false, zoom: DEFAULT_ZOOM };
       var cell, px, py;
 
       function layout() {
@@ -367,7 +374,7 @@
         canvas.width = Math.max(1, w * dpr); canvas.height = Math.max(1, h * dpr);
         canvas.style.width = w + "px"; canvas.style.height = h + "px";
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        cell = Math.min((w - 90) / (SIZE - 1), (h - 90) / (SIZE - 1));
+        cell = Math.min((w - 90) / (SIZE - 1), (h - 90) / (SIZE - 1)) * st.zoom / DEFAULT_ZOOM;
         px = (w - cell * (SIZE - 1)) / 2;
         py = (h - cell * (SIZE - 1)) / 2;
          }
@@ -461,6 +468,7 @@
         clearMarks: function () { st.win = []; st.last = null; draw(); },
         showMoveNumbers: function () { st.showNumbers = true; draw(); },
         hideMoveNumbers: function () { st.showNumbers = false; draw(); },
+        setZoom: function (percent) { st.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Number(percent) || DEFAULT_ZOOM)); draw(); },
         reset: function () { st.stones = {}; st.last = null; st.win = []; st.showNumbers = false; draw(); },
         onPick: function (cb) { onPickCb = cb; },
         onHover: function () { },
@@ -481,6 +489,7 @@
         // 可顯示座標提示；回呼不影響邏輯
       });
       if (!use3D) els.hint.textContent = "已切換 2D 模式（無法載入 3D 引擎）· 點擊棋盤落子";
+      setZoom(els.zoomRange.value || DEFAULT_ZOOM);
        }
 
   function forbiddenLabel(type) {
@@ -623,6 +632,14 @@
 
   function onPick(pos) { placeAt(pos); }
 
+  function setZoom(percent) {
+      var zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Number(percent) || DEFAULT_ZOOM));
+      els.zoomRange.value = String(zoom);
+      els.zoomRange.setAttribute("aria-valuetext", zoom + "%");
+      els.zoomValue.textContent = zoom + "%";
+      if (view && view.setZoom) view.setZoom(zoom);
+       }
+
   function syncDock() {
       // 桌面版控制列永遠顯示；只在行動版允許收合
       if (window.innerWidth > 760) {
@@ -645,6 +662,7 @@
        $("btn-new").addEventListener("click", newGame);
        els.overlayNew.addEventListener("click", newGame);
        els.overlayClose.addEventListener("click", closeOverlay);
+       els.zoomRange.addEventListener("input", function () { setZoom(els.zoomRange.value); });
        $("btn-undo").addEventListener("click", function () {
         if (undoUsed >= undoLimit()) return;   // 已達本局撤銷上限
         var wasOver = game.isOver();

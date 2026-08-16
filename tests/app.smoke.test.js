@@ -109,6 +109,7 @@ test("app 啟動：預設 2D 路徑、黑棋先手、未結束", () => {
   assert.equal(stones.textContent, "0 / 225");
   assert.equal(status.textContent, "進行中");
   assert.equal(mode.textContent, "對戰 AI（困難）");
+  assert.equal(DOM.getElementById("zoom-value").textContent, "100%");
   assert.equal(overlay.classList.contains("show"), false);
 });
 
@@ -182,6 +183,17 @@ test("app 切換模式：對戰 AI ↔ 雙人類", () => {
   assert.equal(mode.textContent, "雙人類");
   DOM.getElementById("btn-mode").dispatch("click");
   assert.equal(mode.textContent, "對戰 AI（困難）");
+});
+
+test("app 棋盤縮放控制：更新縮放比例顯示", () => {
+  var range = DOM.getElementById("zoom-range");
+  var value = DOM.getElementById("zoom-value");
+  range.value = "120";
+  range.dispatch("input");
+  assert.equal(value.textContent, "120%");
+  range.value = "100";
+  range.dispatch("input");
+  assert.equal(value.textContent, "100%");
 });
 
 test("app 新局：清空棋子、隱藏浮層", () => {
