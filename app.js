@@ -58,7 +58,7 @@
      toast: $("toast"),
      overlay: $("overlay"), overlayClose: $("ov-close"), ovEmoji: $("ov-emoji"), ovTitle: $("ov-title"), ovSub: $("ov-sub"),
      zoomRange: $("zoom-range"), zoomValue: $("zoom-value"),
-     overlayNew: $("ov-new"), overlayShare: $("ov-share"), modeLabel: $("mode-label"),
+     overlayNew: $("ov-new"), overlayShare: $("ov-share"), overlayDownload: $("ov-download"), modeLabel: $("mode-label"),
      dock: $("dock"), dockClose: $("dock-close"), dockOpen: $("dock-open")
      };
 
@@ -754,12 +754,42 @@
          });
        }
 
-  function downloadShareImage(blob) {
+  function padZero(n) {
+    return n < 10 ? "0" + n : String(n);
+  }
+
+  function formatDateTime(d) {
+    var date = d instanceof Date ? d : new Date();
+    var y = date.getFullYear();
+    var m = padZero(date.getMonth() + 1);
+    var day = padZero(date.getDate());
+    var h = padZero(date.getHours());
+    var min = padZero(date.getMinutes());
+    var s = padZero(date.getSeconds());
+    return y + m + day + "_" + h + min + s;
+  }
+
+  function getShareFilename(d) {
+    var timeStr = formatDateTime(d);
+    var modeStr = game.vsAI ? "對戰AI-" + diffName() : "雙人對戰";
+    var resultStr = (els.ovTitle && els.ovTitle.textContent && els.ovTitle.textContent.trim()) ? els.ovTitle.textContent.trim() : (
+      game.forbidden ? "黑棋禁手判負" :
+      game.winner === G.BLACK ? "黑棋獲勝" :
+      game.winner === G.WHITE ? "白棋獲勝" :
+      game.winner === "draw" ? "和棋" : "棋局結束"
+    );
+    var movesStr = game.moves.length + "手";
+    var safeResult = resultStr.replace(/[\\/:*?"<>|\s]/g, "");
+    var safeMode = modeStr.replace(/[\\/:*?"<>|\s]/g, "");
+    return "五子棋_" + timeStr + "_" + safeMode + "_" + safeResult + "_" + movesStr + ".png";
+  }
+
+  function downloadShareImage(blob, filename) {
       if (typeof URL === "undefined" || !URL.createObjectURL || !document.body) return false;
       var url = URL.createObjectURL(blob);
       var link = document.createElement("a");
       link.href = url;
-      link.download = "gomoku-result.png";
+      link.download = filename || getShareFilename();
       link.style.display = "none";
       document.body.appendChild(link);
       link.click();
@@ -768,30 +798,42 @@
       return true;
        }
 
-  function fallbackShare(blob) {
-      if (downloadShareImage(blob)) showWarning("已下載棋局圖片，可從照片或檔案分享。");
+  function fallbackShare(blob, filename) {
+      if (downloadShareImage(blob, filename)) showWarning("已下載棋局圖片，可從照片或檔案分享。");
       else showWarning("目前無法建立棋局圖片。");
+       }
+
+  function downloadResult() {
+      if (!game.isOver() || !els.overlayDownload) return;
+      els.overlayDownload.disabled = true;
+      var filename = getShareFilename();
+      Promise.resolve().then(function () { return canvasToBlob(makeShareCanvas()); }).then(function (blob) {
+        if (downloadShareImage(blob, filename)) showWarning("已下載棋局圖片。");
+        else showWarning("目前無法下載棋局圖片。");
+         }).catch(function () { showWarning("目前無法建立棋局圖片。"); })
+        .finally(function () { els.overlayDownload.disabled = false; });
        }
 
   function shareResult() {
       if (!game.isOver() || !els.overlayShare) return;
       els.overlayShare.disabled = true;
+      var filename = getShareFilename();
       Promise.resolve().then(function () { return canvasToBlob(makeShareCanvas()); }).then(function (blob) {
         var nav = typeof navigator !== "undefined" ? navigator : null;
         var canUseFileShare = nav && typeof nav.share === "function" && typeof nav.canShare === "function" && typeof File !== "undefined";
         if (canUseFileShare) {
-          try { canUseFileShare = nav.canShare({ files: [new File([blob], "gomoku-result.png", { type: "image/png" })] }); }
+          try { canUseFileShare = nav.canShare({ files: [new File([blob], filename, { type: "image/png" })] }); }
           catch (e) { canUseFileShare = false; }
         }
         if (!canUseFileShare) {
-          fallbackShare(blob);
+          fallbackShare(blob, filename);
           return;
         }
-        var file = new File([blob], "gomoku-result.png", { type: "image/png" });
+        var file = new File([blob], filename, { type: "image/png" });
         return nav.share({ title: "五子棋對局結果", text: shareCondition(), files: [file] })
           .then(function () { showWarning("已開啟分享選單，可分享或儲存到照片。"); })
           .catch(function (err) {
-            if (!err || err.name !== "AbortError") fallbackShare(blob);
+            if (!err || err.name !== "AbortError") fallbackShare(blob, filename);
              });
          }).catch(function () { showWarning("目前無法建立棋局圖片。"); })
         .finally(function () { els.overlayShare.disabled = false; });
@@ -917,6 +959,7 @@
        els.overlayNew.addEventListener("click", newGame);
        els.overlayClose.addEventListener("click", closeOverlay);
        els.overlayShare.addEventListener("click", shareResult);
+       els.overlayDownload.addEventListener("click", downloadResult);
        els.turn.addEventListener("click", reopenOverlay);
        els.zoomRange.addEventListener("input", function () { setZoom(els.zoomRange.value); });
        $("btn-undo").addEventListener("click", function () {
@@ -970,7 +1013,9 @@
       place: function (x, y) { placeAt({ x: x, y: y }); },
       finish: finish,
       share: shareResult,
+      download: downloadResult,
       captureShare: makeShareCanvas,
+      getShareFilename: getShareFilename,
       refresh: refresh,
       newGame: newGame,
       undo: function () {

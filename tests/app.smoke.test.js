@@ -297,8 +297,15 @@ test("app 勝負浮層：finish() 設定狀態與浮層", () => {
   API.finish();
   assert.equal(status.textContent, "黑棋勝");
   assert.equal(typeof API.share, "function", "公開分享功能已掛上 window");
+  assert.equal(typeof API.download, "function", "公開下載圖片功能已掛上 window");
+  assert.equal(typeof API.getShareFilename, "function", "公開取得下載檔名功能已掛上 window");
+  var fixedDate = new Date(2026, 7, 18, 21, 45, 0); // 2026-08-18 21:45:00
+  var fn = API.getShareFilename(fixedDate);
+  assert.equal(fn, "五子棋_20260818_214500_雙人對戰_黑棋獲勝_5手.png", "下載檔名包含日期、時間、模式、結果與手數");
+  assert.match(API.getShareFilename(), /^五子棋_\d{8}_\d{6}_雙人對戰_黑棋獲勝_5手\.png$/, "預設時間格式正確");
   assert.equal(typeof API.captureShare, "function", "分享圖片產生功能已掛上 window");
   assert.equal(DOM.getElementById("ov-share").events.click.length, 1, "結果看板已綁定分享按鈕");
+  assert.equal(DOM.getElementById("ov-download").events.click.length, 1, "結果看板已綁定下載圖片按鈕");
   var shareCanvas = API.captureShare();
   assert.equal(shareCanvas.width, 1200, "分享圖片使用手機友善的固定寬度");
   assert.equal(shareCanvas.height, 1450, "分享圖片包含完整棋盤與上下資訊區塊");
