@@ -606,13 +606,23 @@
        }
 
   function reopenOverlay() {
-      if (!game.isOver()) return;
+      if (!game.isOver()) {
+        var cur = game.currentPlayer();
+        var emoji = cur === G.BLACK ? "⚫" : "⚪";
+        var title = cur === G.BLACK ? "輪到黑棋" : "輪到白棋";
+        if (game.vsAI) title += cur === game.humanPlayer ? "（你）" : "（AI）";
+        var sub = "對奕進行中 · 目前已下 " + game.moves.length + " 手";
+        els.ovEmoji.textContent = emoji;
+        els.ovTitle.textContent = title;
+        els.ovSub.textContent = sub;
+      }
       showOverlay();
        }
 
   function shareCondition() {
       var mode = game.vsAI ? "對戰 AI · 難度：" + diffName() : "雙人對戰";
-      return mode + " · " + (els.ovTitle.textContent || "棋局結束") + " · 15×15 棋盤 · " + game.moves.length + " 手";
+      var status = (els.ovTitle && els.ovTitle.textContent) ? els.ovTitle.textContent : (game.isOver() ? "棋局結束" : "對奕進行中");
+      return mode + " · " + status + " · 15×15 棋盤 · " + game.moves.length + " 手";
        }
 
   function drawShareStone(c, x, y, radius, player, moveNumber) {
@@ -718,7 +728,7 @@
       c.fillText("五子棋 · GOMOKU", pad, 78);
       c.fillStyle = "#9fb0d4";
       c.font = "600 30px PingFang TC, Noto Sans TC, sans-serif";
-      c.fillText((game.vsAI ? "對戰 AI · 難度：" + diffName() : "雙人對戰") + " · " + (els.ovTitle.textContent || "棋局結束"), pad, 132);
+      c.fillText((game.vsAI ? "對戰 AI · 難度：" + diffName() : "雙人對戰") + " · " + (els.ovTitle.textContent || (game.isOver() ? "棋局結束" : "對奕進行中")), pad, 132);
       c.font = "600 28px PingFang TC, Noto Sans TC, sans-serif";
       c.fillText("15×15 完整棋盤 · " + game.moves.length + " 手", pad, 178);
 
@@ -728,7 +738,7 @@
       c.fillStyle = "#9fb0d4";
       c.font = "600 28px PingFang TC, Noto Sans TC, sans-serif";
       c.textAlign = "left";
-      c.fillText("完整 15×15 棋盤結果", pad, canvas.height - 54);
+      c.fillText(game.isOver() ? "完整 15×15 棋盤結果" : "完整 15×15 棋盤現況", pad, canvas.height - 54);
       var authorText = "Made with ❤️ by Will 保哥";
       var authorRight = canvas.width - pad;
       var authorWidth = c.measureText(authorText).width;
@@ -775,7 +785,8 @@
       game.forbidden ? "黑棋禁手判負" :
       game.winner === G.BLACK ? "黑棋獲勝" :
       game.winner === G.WHITE ? "白棋獲勝" :
-      game.winner === "draw" ? "和棋" : "棋局結束"
+      game.winner === "draw" ? "和棋" :
+      !game.isOver() ? "對奕進行中" : "棋局結束"
     );
     var movesStr = game.moves.length + "手";
     var safeResult = resultStr.replace(/[\\/:*?"<>|\s]/g, "");
@@ -803,7 +814,7 @@
        }
 
   function downloadResult() {
-      if (!game.isOver() || !els.overlayDownload) return;
+      if (!els.overlayDownload) return;
       els.overlayDownload.disabled = true;
       var filename = getShareFilename();
       Promise.resolve().then(function () { return canvasToBlob(makeShareCanvas()); }).then(function (blob) {
@@ -814,7 +825,7 @@
        }
 
   function shareResult() {
-      if (!game.isOver() || !els.overlayShare) return;
+      if (!els.overlayShare) return;
       els.overlayShare.disabled = true;
       var filename = getShareFilename();
       Promise.resolve().then(function () { return canvasToBlob(makeShareCanvas()); }).then(function (blob) {

@@ -340,9 +340,33 @@ test("app 勝負浮層：finish() 設定狀態與浮層", () => {
   assert.ok(shareCanvas._ctx._fillTexts.includes("Made with ❤️ by Will 保哥"), "分享圖片包含指定署名");
   var authorCall = shareCanvas._ctx._fillCalls.find(function (call) { return call.text === "Made with ❤️ by Will 保哥"; });
   assert.ok(authorCall && authorCall.x < shareCanvas.width - 60, "作者資訊完整放在圖片右側內縮區域");
-  overlay.classList.add("show");
-  DOM.getElementById("ov-close").dispatch("click");
   assert.equal(overlay.classList.contains("show"), false, "X 可關閉結果浮層");
+});
+
+test("app 對奕進行中：點擊「輪到黑棋」可開啟對話框並可分享/下載目前盤勢", () => {
+  var API = global.window.GomokuApp;
+  var turn = DOM.getElementById("turn");
+  var ovTitle = DOM.getElementById("ov-title");
+  var ovSub = DOM.getElementById("ov-sub");
+  var btnNew = DOM.getElementById("ov-new");
+  var btnShare = DOM.getElementById("ov-share");
+  var btnDownload = DOM.getElementById("ov-download");
+
+  API.newGame();
+  assert.equal(API.game.isOver(), false, "遊戲進行中");
+  overlay.classList.remove("show");
+
+  turn.dispatch("click");
+  assert.equal(overlay.classList.contains("show"), true, "點擊「輪到黑棋」可開啟對話框");
+  assert.equal(ovTitle.textContent.includes("輪到黑棋"), true, "對話框標題顯示輪到黑棋");
+  assert.equal(ovSub.textContent.includes("對奕進行中"), true, "對話框副標題顯示對奕進行中");
+  assert.ok(btnNew, "新局按鈕存在");
+  assert.ok(btnShare, "分享按鈕存在");
+  assert.ok(btnDownload, "下載按鈕存在");
+
+  var fixedDate = new Date(2026, 7, 18, 22, 25, 0);
+  var midGameFilename = API.getShareFilename(fixedDate);
+  assert.equal(midGameFilename.includes("輪到黑棋") || midGameFilename.includes("對奕進行中"), true, "進行中下載檔名包含對奕狀態");
 });
 
 test("app 落子編號：關閉結果浮層後才顯示", () => {
