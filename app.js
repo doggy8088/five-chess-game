@@ -9,7 +9,7 @@
      if (!G) { console.error("[五子棋] game.js 尚未載入"); return; }
 
      var SIZE = 15;
-     var ZOOM_MIN = 70, ZOOM_MAX = 130, DEFAULT_ZOOM = 100;
+     var ZOOM_MIN = 30, ZOOM_MAX = 130, DEFAULT_ZOOM = 100;
      var SETTINGS_KEY = "gomoku-settings-v1";
 
   function normalizeDifficulty(value) {
@@ -187,7 +187,7 @@
       var orbit = { radius: 15, theta: 0.6, phi: 0.92, last: { x: 0, y: 0 } };
       var reportedZoom = DEFAULT_ZOOM, onZoomCb = null;
       function applyCam() {
-        orbit.radius = Math.max(8, Math.min(30, orbit.radius));
+        orbit.radius = Math.max(8, Math.min(60, orbit.radius));
         var sp = Math.sin(orbit.phi), cp = Math.cos(orbit.phi);
         camera.position.set(
           orbit.radius * sp * Math.sin(orbit.theta),

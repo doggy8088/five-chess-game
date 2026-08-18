@@ -197,6 +197,9 @@ test("app 棋盤縮放控制：更新縮放比例顯示", () => {
   range.value = "120";
   range.dispatch("input");
   assert.equal(value.textContent, "120%");
+  range.value = "30";
+  range.dispatch("input");
+  assert.equal(value.textContent, "30%", "支援縮小至 30% 以完整適配行動版螢幕寬度");
   range.value = "100";
   range.dispatch("input");
   assert.equal(value.textContent, "100%");
@@ -205,9 +208,9 @@ test("app 棋盤縮放控制：更新縮放比例顯示", () => {
 test("app 設定：記憶最後選擇的難度與縮放比例", () => {
   var range = DOM.getElementById("zoom-range");
   setDiff("easy");
-  range.value = "120";
+  range.value = "30";
   range.dispatch("input");
-  assert.deepEqual(JSON.parse(global.localStorage.getItem("gomoku-settings-v1")), { difficulty: "easy", zoom: 120 });
+  assert.deepEqual(JSON.parse(global.localStorage.getItem("gomoku-settings-v1")), { difficulty: "easy", zoom: 30 });
 
   setDiff("hard");
   range.value = "100";
