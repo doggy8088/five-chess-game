@@ -217,10 +217,33 @@ test("app 設定：記憶最後選擇的難度與縮放比例", () => {
   range.dispatch("input");
 });
 
-test("app 新局：清空棋子、隱藏浮層", () => {
+test("app 新局：清空棋子、隱藏浮層與自動隱藏控制面板", () => {
+  var dock = DOM.getElementById("dock");
+  var dockOpen = DOM.getElementById("dock-open");
+  dock.classList.remove("hidden");
+  dockOpen.classList.remove("show");
   DOM.getElementById("btn-new").dispatch("click");
   assert.equal(stones.textContent, "0 / 225");
   assert.equal(overlay.classList.contains("show"), false);
+  assert.equal(dock.classList.contains("hidden"), true, "新局自動隱藏面板");
+  assert.equal(dockOpen.classList.contains("show"), true, "新局自動顯示右上角開啟鈕");
+});
+
+test("app 控制列收合：桌面版可點擊關閉並透過右上角 Icon 重新開啟", () => {
+  var dock = DOM.getElementById("dock");
+  var dockClose = DOM.getElementById("dock-close");
+  var dockOpen = DOM.getElementById("dock-open");
+
+  dock.classList.remove("hidden");
+  dockOpen.classList.remove("show");
+
+  dockClose.dispatch("click");
+  assert.equal(dock.classList.contains("hidden"), true, "點擊關閉按鈕後控制面板收起");
+  assert.equal(dockOpen.classList.contains("show"), true, "控制面板收起後顯示右上角開啟 Icon");
+
+  dockOpen.dispatch("click");
+  assert.equal(dock.classList.contains("hidden"), false, "點擊右上角開啟 Icon 後控制面板重新展開");
+  assert.equal(dockOpen.classList.contains("show"), false, "控制面板展開後隱藏開啟 Icon");
 });
 
 test("app 新局：關閉行動版設定面板", () => {

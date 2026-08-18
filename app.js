@@ -579,7 +579,6 @@
          }
 
   function closeSettingsPanel() {
-      if (window.innerWidth > 760) return;
       els.dock.classList.add("hidden");
       els.dockOpen.classList.add("show");
        }
@@ -938,11 +937,7 @@
        }
 
   function syncDock() {
-      // 桌面版控制列永遠顯示；只在行動版允許收合
-      if (window.innerWidth > 760) {
-        els.dock.classList.remove("hidden");
-        els.dockOpen.classList.remove("show");
-      }
+      // 響應式佈局調整時保留既有收合狀態
     }
 
   function wireUI() {

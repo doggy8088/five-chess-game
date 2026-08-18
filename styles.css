@@ -89,11 +89,11 @@ header.top{
 }
 #dock.hidden{ display:none; }
 
-/* 控制列右上角的關閉鈕（行動版專用） */
+/* 控制列右上角的關閉鈕 */
 .dock-close{
   position:absolute; top:-12px; right:-12px; z-index:6;
   width:32px; height:32px; padding:0; border-radius:50%;
-  display:none; align-items:center; justify-content:center;
+  display:inline-flex; align-items:center; justify-content:center;
   background:linear-gradient(180deg,#2a3252,#161c33); border:1px solid var(--panel-border);
   color:var(--ink); cursor:pointer; box-shadow:var(--shadow);
   transition:transform .12s ease, background .18s ease, border-color .18s ease;
@@ -102,9 +102,9 @@ header.top{
 .dock-close:active{ transform:scale(.96); }
 .dock-close .ico{ width:16px; height:16px; display:inline-block; }
 
-/* 收起後重新開啟控制列的浮動鈕（行動版專用） */
+/* 收起後重新開啟控制列的浮動鈕（右上角） */
 .dock-open{
-  position:absolute; z-index:6; top:16px; right:16px;
+  position:absolute; z-index:6; top:16px; right:22px;
   width:44px; height:44px; padding:0; border-radius:50%;
   display:none; align-items:center; justify-content:center;
   background:var(--panel); border:1px solid var(--panel-border);
@@ -234,8 +234,5 @@ button.btn.primary{ background:linear-gradient(180deg,var(--accent),#e85f40); bo
   #dock #btn-new, #dock #btn-undo{ flex:1 1 calc(50% - 5px); min-width:0; justify-content:center; }
   #dock #btn-mode{ flex:1 1 100%; justify-content:center; }
   .dock-close{ display:inline-flex; }
-}
-@media (min-width:761px){
-  #dock.hidden{ display:flex; }
-  .dock-open.show{ display:none; }
+  .dock-open{ right:16px; }
 }
