@@ -137,10 +137,29 @@ button.btn.primary{ background:linear-gradient(180deg,var(--accent),#e85f40); bo
   appearance:none; cursor:pointer; font:inherit; font-size:12px; font-weight:600;
   color:var(--ink-dim); border:0; background:transparent; padding:7px 11px; border-radius:9px;
   white-space:nowrap;
+  display:inline-flex; align-items:center; justify-content:center;
   transition:all .15s ease;
 }
 .seg button[aria-pressed="true"]{ background:rgba(84,209,255,0.16); color:#fff;
   box-shadow:inset 0 0 0 1px rgba(84,209,255,.4); }
+
+.sw-dot{
+  display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px;
+  flex-shrink:0;
+}
+.sw-dot.black{
+  background:radial-gradient(circle at 35% 30%, #5a6175, #17191f);
+  box-shadow:0 1px 2px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.3);
+}
+.sw-dot.white{
+  background:radial-gradient(circle at 35% 30%, #ffffff, #d3cdbc);
+  box-shadow:0 1px 2px rgba(0,0,0,0.4);
+}
+
+#seg-side.disabled{
+  opacity:0.35;
+  pointer-events:none;
+}
 
 .zoom-control{ display:flex; flex-direction:column; gap:5px; flex:0 1 180px; min-width:140px; flex-shrink:0; }
 .zoom-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--ink-dim); font-size:12px; white-space:nowrap; }
@@ -230,6 +249,8 @@ button.btn.primary{ background:linear-gradient(180deg,var(--accent),#e85f40); bo
   #overlay .card{ min-height:270px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
   #dock{ width:94vw; max-width:94vw; flex-wrap:wrap; justify-content:center; }
   #dock .seg{ flex:1 1 100%; justify-content:center; }
+  #dock .seg button{ justify-content:center; }
+  #dock #seg-side button{ flex:1 1 50%; }
   #dock .divider{ display:none; }
   .zoom-control{ flex:1 1 100%; min-width:0; width:100%; }
   #dock #btn-new, #dock #btn-undo{ flex:1 1 calc(50% - 5px); min-width:0; justify-content:center; }

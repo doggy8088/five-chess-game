@@ -23,22 +23,32 @@
       return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom));
        }
 
+  function normalizePlayerSide(value) {
+      return value === "white" ? "white" : "black";
+       }
+
   function loadSettings() {
       try {
         var raw = localStorage.getItem(SETTINGS_KEY);
         if (raw) {
           var saved = JSON.parse(raw);
-          return { difficulty: normalizeDifficulty(saved.difficulty), zoom: normalizeZoom(saved.zoom) };
+          return {
+            difficulty: normalizeDifficulty(saved.difficulty),
+            zoom: normalizeZoom(saved.zoom),
+            playerSide: normalizePlayerSide(saved.playerSide)
+          };
         }
       } catch (e) { /* 忽略損壞或不可用的設定 */ }
-      return { difficulty: "hard", zoom: DEFAULT_ZOOM };
+      return { difficulty: "hard", zoom: DEFAULT_ZOOM, playerSide: "black" };
        }
 
   var savedSettings = loadSettings();
     var difficulty = savedSettings.difficulty;   // easy | medium | hard
     var currentZoom = savedSettings.zoom;
+    var playerSide = savedSettings.playerSide;   // black | white
     var vsAI = true;
-    var game = G.createGame({ size: SIZE, vsAI: vsAI, aiPlayer: G.WHITE, difficulty: difficulty });
+    var aiPlayer = vsAI ? (playerSide === "white" ? G.BLACK : G.WHITE) : null;
+    var game = G.createGame({ size: SIZE, vsAI: vsAI, aiPlayer: aiPlayer, difficulty: difficulty });
 
     var locked = false;        // AI 思考中鎖定人類點擊
     var undoUsed = 0;          // 本局已使用的撤銷次數（新局歸零）
@@ -64,7 +74,7 @@
 
   function saveSettings() {
       try {
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify({ difficulty: difficulty, zoom: currentZoom }));
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({ difficulty: difficulty, zoom: currentZoom, playerSide: playerSide }));
       } catch (e) { /* 忽略不可用的儲存空間 */ }
        }
 
@@ -91,8 +101,8 @@
 
   function recordResult(w) {
       statsSnapshot = { wins: stats.wins, losses: stats.losses, draws: stats.draws, streak: stats.streak, best: stats.best };
-      if (w === G.BLACK) { stats.wins++; stats.streak++; }
-      else if (w === G.WHITE) { stats.losses++; stats.streak = 0; }
+      if (w === game.humanPlayer) { stats.wins++; stats.streak++; }
+      else if (w === game.aiPlayer) { stats.losses++; stats.streak = 0; }
       else { stats.draws++; stats.streak = 0; }
       if (stats.streak > stats.best) stats.best = stats.streak;
       saveStats();
@@ -585,7 +595,8 @@
 
 
   function newGame() {
-      game = G.createGame({ size: SIZE, vsAI: vsAI, aiPlayer: G.WHITE, difficulty: difficulty });
+      var ap = vsAI ? (playerSide === "white" ? G.BLACK : G.WHITE) : null;
+      game = G.createGame({ size: SIZE, vsAI: vsAI, aiPlayer: ap, difficulty: difficulty });
       undoUsed = 0;
       view.clearMarks();
       view.reset();
@@ -593,6 +604,9 @@
       hideOverlay();
       if (els.toast) els.toast.classList.remove("show");
       refresh();
+      if (vsAI && game.currentPlayer() === game.aiPlayer) {
+        requestAI();
+      }
        }
 
   function closeOverlay() {
@@ -933,6 +947,17 @@
          });
        }
 
+  function syncSideButtons() {
+      document.querySelectorAll(".seg [data-side]").forEach(function (button) {
+        button.setAttribute("aria-pressed", button.getAttribute("data-side") === playerSide ? "true" : "false");
+         });
+      var segSide = $("seg-side");
+      if (segSide) {
+        if (vsAI) segSide.classList.remove("disabled");
+        else segSide.classList.add("disabled");
+      }
+       }
+
   function diffName() { return difficulty === "easy" ? "簡單" : difficulty === "medium" ? "中等" : "困難"; }
 
   function onPick(pos) { placeAt(pos); }
@@ -961,6 +986,16 @@
           refresh();
            });
          });
+      document.querySelectorAll(".seg [data-side]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          var side = b.getAttribute("data-side");
+          if (side === playerSide) return;
+          playerSide = side;
+          syncSideButtons();
+          saveSettings();
+          newGame();
+           });
+         });
        $("btn-new").addEventListener("click", newGame);
        els.overlayNew.addEventListener("click", newGame);
        els.overlayClose.addEventListener("click", closeOverlay);
@@ -982,9 +1017,10 @@
        $("btn-mode").addEventListener("click", function () {
         vsAI = !vsAI;
         game.vsAI = vsAI;
-        game.aiPlayer = vsAI ? G.WHITE : null;
-        game.humanPlayer = vsAI ? G.BLACK : null;
+        game.humanPlayer = vsAI ? (playerSide === "white" ? G.WHITE : G.BLACK) : null;
+        game.aiPlayer = vsAI ? (playerSide === "white" ? G.BLACK : G.WHITE) : null;
         els.modeLabel.textContent = vsAI ? "對戰 AI" : "雙人類";
+        syncSideButtons();
         refresh();
         if (vsAI && game.currentPlayer() === game.aiPlayer && !game.isOver()) requestAI();
          });
@@ -1005,8 +1041,11 @@
       buildView();
       wireUI();
       syncDifficultyButtons();
+      syncSideButtons();
       refresh();
-      // 此設定黑棋先手，AI 為白，無需自動先行。
+      if (vsAI && game.currentPlayer() === game.aiPlayer) {
+        requestAI();
+      }
       setTimeout(function () { els.hint.style.opacity = "0"; }, 6500);
        }
 
@@ -1016,6 +1055,13 @@
     window.GomokuApp = {
       get game() { return game; },
       get stats() { return stats; },
+      get playerSide() { return playerSide; },
+      setPlayerSide: function (side) {
+        playerSide = normalizePlayerSide(side);
+        syncSideButtons();
+        saveSettings();
+        newGame();
+      },
       place: function (x, y) { placeAt({ x: x, y: y }); },
       finish: finish,
       share: shareResult,

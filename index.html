@@ -63,7 +63,7 @@
 </script>
 
 <!-- 本地資產版本戳：更新 JS／CSS 時同步修改，避免瀏覽器沿用舊快取。 -->
-<link rel="stylesheet" href="styles.css?v=20260816-10" />
+<link rel="stylesheet" href="styles.css?v=20260819-01" />
 
 <!-- three.js 是唯一的第三方資源，由 CDN 載入（不用 build、無本地相依）。
      若離線／被擋住時，頁面會自動改用 2D Canvas 渲染，確保始終可玩。 -->
@@ -109,6 +109,10 @@
      <button data-diff="easy" aria-pressed="false">簡單</button>
      <button data-diff="medium" aria-pressed="false">中等</button>
      <button data-diff="hard" aria-pressed="true">困難</button>
+   </div>
+   <div class="seg" role="group" aria-label="執子陣營" id="seg-side">
+     <button data-side="black" aria-pressed="true"><span class="sw-dot black"></span>執黑</button>
+     <button data-side="white" aria-pressed="false"><span class="sw-dot white"></span>執白</button>
    </div>
    <div class="zoom-control">
      <div class="zoom-head"><label for="zoom-range">棋盤縮放</label><output id="zoom-value" for="zoom-range">100%</output></div>
@@ -162,7 +166,7 @@
    </div>
 </div>
 
-<script src="game.js?v=20260816-10"></script>
-<script src="app.js?v=20260816-10"></script>
+<script src="game.js?v=20260819-01"></script>
+<script src="app.js?v=20260819-01"></script>
 </body>
 </html>

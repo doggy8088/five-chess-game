@@ -55,6 +55,8 @@ function installDom(innerW, innerH) {
     }
   var diffButtons = [makeEl(), makeEl(), makeEl()];
   diffButtons.forEach((b, i) => { b.setAttribute("data-diff", ["easy", "medium", "hard"][i]); b.setAttribute("aria-pressed", "false"); });
+  var sideButtons = [makeEl(), makeEl()];
+  sideButtons.forEach((b, i) => { b.setAttribute("data-side", ["black", "white"][i]); b.setAttribute("aria-pressed", i === 0 ? "true" : "false"); });
 
   global.window = {
     Game: require("../game.js"),
@@ -74,6 +76,7 @@ function installDom(innerW, innerH) {
     getElementById: byId,
     querySelectorAll(sel) {
       if (sel.indexOf("data-diff") !== -1) return diffButtons;
+      if (sel.indexOf("data-side") !== -1) return sideButtons;
       return [];
         },
     createElement(tag) { return tag === "canvas" ? makeCanvas({ w: innerW, h: innerH }) : makeEl(); },
@@ -91,6 +94,10 @@ function coords(gx, gy, innerW, innerH) {
 function click(view, gx, gy, W, H) { var c = coords(gx, gy, W, H); view.dispatch("pointerdown", { clientX: c.x, clientY: c.y, buttons: 0 }); }
 function setDiff(d) {
   var btn = DOM.querySelectorAll(".seg [data-diff]").find((b) => b.getAttribute("data-diff") === d);
+  btn.dispatch("click");
+}
+function setSide(s) {
+  var btn = DOM.querySelectorAll(".seg [data-side]").find((b) => b.getAttribute("data-side") === s);
   btn.dispatch("click");
 }
 
@@ -205,16 +212,41 @@ test("app 棋盤縮放控制：更新縮放比例顯示", () => {
   assert.equal(value.textContent, "100%");
 });
 
-test("app 設定：記憶最後選擇的難度與縮放比例", () => {
+test("app 設定：記憶最後選擇的難度、縮放比例與執子陣營", () => {
   var range = DOM.getElementById("zoom-range");
   setDiff("easy");
   range.value = "30";
   range.dispatch("input");
-  assert.deepEqual(JSON.parse(global.localStorage.getItem("gomoku-settings-v1")), { difficulty: "easy", zoom: 30 });
+  assert.deepEqual(JSON.parse(global.localStorage.getItem("gomoku-settings-v1")), { difficulty: "easy", zoom: 30, playerSide: "black" });
 
+  setSide("white");
+  assert.deepEqual(JSON.parse(global.localStorage.getItem("gomoku-settings-v1")), { difficulty: "easy", zoom: 30, playerSide: "white" });
+
+  setSide("black");
   setDiff("hard");
   range.value = "100";
   range.dispatch("input");
+});
+
+test("app 執子設定：切換執白時 AI 自動下先手黑棋，HUD 顯示輪到白棋（你）", async () => {
+  var turnLabel = DOM.getElementById("turn-label");
+  setSide("white");
+  await sleep(330);
+  assert.equal(stones.textContent, "1 / 225", "玩家執白時，AI 先下黑棋第一手");
+  assert.equal(global.window.GomokuApp.game.humanPlayer, G.WHITE);
+  assert.equal(global.window.GomokuApp.game.aiPlayer, G.BLACK);
+  assert.equal(turnLabel.textContent, "輪到白棋（你）");
+
+  // 玩家下第二手（白棋）
+  click(FB, 0, 0, W, H);
+  await sleep(330);
+  assert.equal(stones.textContent, "3 / 225", "玩家下白棋後 AI 再回應黑棋");
+
+  // 還原為執黑
+  setSide("black");
+  await sleep(330);
+  assert.equal(global.window.GomokuApp.game.humanPlayer, G.BLACK);
+  assert.equal(stones.textContent, "0 / 225", "切換回執黑後開新局");
 });
 
 test("app 新局：清空棋子、隱藏浮層與自動隱藏控制面板", () => {
