@@ -55,20 +55,32 @@ function () {
     chatText: 120, cannedId: 32, chatHistory: 50
   };
 
-  // ---- 快速訊息白名單（12 句，五子棋風）----
+  // ---- 快速訊息白名單（含 Emoji 與嗆聲垃圾話，id 同時是 client/server 白名單）----
   P.CANNED_MESSAGES = {
-    "hello": "哈囉，請多指教！",
-    "hurry": "快下啦～",
-    "thinking-long": "讓我想想喔…",
-    "nice-move": "好棋！",
-    "oops": "啊，下錯了",
-    "doomed": "大勢已去了",
-    "wait": "等我想一下啦",
-    "thanks": "謝謝指教",
-    "trap": "小心有陷阱喔",
-    "good-stone": "這手妙啊！",
-    "lag": "我的網路好卡…",
-    "rematch": "再來一局啦！"
+    "hello": "👋 哈囉，請多指教！",
+    "good-luck": "🍀 好運喔！",
+    "hurry": "⏰ 快下啦～",
+    "thinking-long": "🤔 讓我想想喔…",
+    "nice-move": "👏 好棋！",
+    "oops": "😱 啊，下錯了",
+    "doomed": "😵 大勢已去了",
+    "wait": "✋ 等我想一下啦",
+    "thanks": "🙏 謝謝指教",
+    "trap": "🪤 小心有陷阱喔",
+    "good-stone": "🔥 這手妙啊！",
+    "lag": "🐢 我的網路好卡…",
+    "rematch": "🔁 再來一局啦！",
+    "gg": "🎮 GG，打得漂亮",
+    "scared": "🐔 你在怕什麼？",
+    "come-on": "😈 來啊，互相傷害！",
+    "trapped-you": "😏 你已經中計了",
+    "winning": "😎 這局我穩了",
+    "too-strong": "😳 你也太強了吧",
+    "sleepy": "🥱 你想很久耶…",
+    "surrender": "🏳️ 快點投降吧你",
+    "focus": "🧐 專心一點啊",
+    "lucky": "🤞 那只是運氣好",
+    "again": "😤 不服再戰！"
   };
   P.cannedText = function (id) { return P.CANNED_MESSAGES[id] || null; };
 
