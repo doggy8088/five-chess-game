@@ -153,6 +153,60 @@
     showScreen("home");
   }
 
+  /* ==================== 聊天抽屜拖曳（§6.2：按住標題列拖到任意位置）==================== */
+
+  // 第一次拖曳即脫離 CSS 錨點（right/bottom/transform）改自由定位
+  function enableDrawerDrag() {
+    var head = els.drawerHead;
+    if (!head) return;
+    var drag = null;
+
+    head.addEventListener("pointerdown", function (ev) {
+      if (drag) return;
+      if (ev.target && ev.target.closest && ev.target.closest("button")) return; // 分頁／關閉鈕不觸發拖曳
+      var rect = els.drawer.getBoundingClientRect();
+      drag = { px: ev.clientX, py: ev.clientY, left: rect.left, top: rect.top };
+      // 脫離 CSS 錨點：改自由定位
+      els.drawer.style.right = "auto";
+      els.drawer.style.bottom = "auto";
+      els.drawer.style.transform = "none";
+      els.drawer.style.left = rect.left + "px";
+      els.drawer.style.top = rect.top + "px";
+      els.drawer.style.width = rect.width + "px";
+      els.drawer.style.height = rect.height + "px";
+      try { head.setPointerCapture(ev.pointerId); } catch (e) { /* 忽略 */ }
+      ev.preventDefault();
+    });
+
+    head.addEventListener("pointermove", function (ev) {
+      if (!drag) return;
+      var w = els.drawer.offsetWidth, h = els.drawer.offsetHeight;
+      var left = Math.min(Math.max(drag.left + (ev.clientX - drag.px), 4), Math.max(window.innerWidth - w - 4, 4));
+      var top = Math.min(Math.max(drag.top + (ev.clientY - drag.py), 4), Math.max(window.innerHeight - 44, 4)); // 標題列至少留在視窗內
+      els.drawer.style.left = left + "px";
+      els.drawer.style.top = top + "px";
+    });
+
+    function endDrag(ev) {
+      if (!drag) return;
+      drag = null;
+      try { if (ev.pointerId !== undefined) head.releasePointerCapture(ev.pointerId); } catch (e) { /* 忽略 */ }
+    }
+    head.addEventListener("pointerup", endDrag);
+    head.addEventListener("pointercancel", endDrag);
+
+    // 視窗縮放時把自由定位的抽屜夾回可視範圍
+    window.addEventListener("resize", function () {
+      if (drawerOpen && els.drawer.style.left) {
+        var w = els.drawer.offsetWidth, h = els.drawer.offsetHeight;
+        var left = Math.min(parseFloat(els.drawer.style.left) || 0, Math.max(window.innerWidth - w - 4, 4));
+        var top = Math.min(parseFloat(els.drawer.style.top) || 0, Math.max(window.innerHeight - h - 4, 4));
+        els.drawer.style.left = Math.max(left, 4) + "px";
+        els.drawer.style.top = Math.max(top, 4) + "px";
+      }
+    });
+  }
+
   /* ==================== 確認 dialog ==================== */
 
   function openConfirm(title, sub, okText, onOk, cancelText, onCancel) {
@@ -1198,6 +1252,7 @@
     els.btnChat.addEventListener("click", function () {
       if (drawerOpen) closeDrawer(); else openDrawer();
     });
+    enableDrawerDrag();
     els.drawerClose.addEventListener("click", closeDrawer);
     els.tabChat.addEventListener("click", function () { setDrawerTab("chat"); });
     els.tabPeople.addEventListener("click", function () { setDrawerTab("people"); });

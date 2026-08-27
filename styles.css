@@ -412,7 +412,9 @@ body.mode-online #stats .row:nth-child(1), body.mode-online #stats .row:nth-chil
   background:rgba(15,20,40,0.96); border:1px solid var(--panel-border); border-radius:16px;
   box-shadow:var(--shadow); overflow:hidden; }
 .drawer-head{ display:flex; align-items:center; justify-content:space-between;
-  padding:10px 12px; border-bottom:1px solid var(--panel-border); cursor:grab; background:rgba(9,13,25,0.6); }
+  padding:10px 12px; border-bottom:1px solid var(--panel-border); cursor:grab; background:rgba(9,13,25,0.6);
+  touch-action:none; user-select:none; -webkit-user-select:none; }
+.drawer-head:active{ cursor:grabbing; }
 .drawer-tabs{ display:flex; gap:6px; }
 .drawer-tab{ padding:7px 14px; border-radius:999px; border:1px solid transparent; background:transparent;
   color:var(--ink-dim); font-weight:700; font-size:13px; cursor:pointer; }
