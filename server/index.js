@@ -4,6 +4,8 @@
 
 var path = require("path");
 var http = require("http");
+var fs = require("fs");
+var crypto = require("crypto");
 var express = require("express");
 var WebSocket = require("ws");
 
@@ -21,6 +23,29 @@ function createServer(opts) {
   var rootDir = path.join(__dirname, "..");
 
   // ---- HTTP ----
+  var indexCache = null;
+
+  // 依「內容雜湊」注入資產版本：index.html 中 ?v=__ASSET_VER__ 於請求時
+  // 以檔案 sha1 前 8 碼取代；檔案內容改變 → URL 改變 → 瀏覽器自動抓新版。
+  function assetVersion(relPath) {
+    try {
+      var buf = fs.readFileSync(path.join(rootDir, relPath));
+      return crypto.createHash("sha1").update(buf).digest("hex").slice(0, 8);
+    } catch (e) {
+      return config.VERSION; // 檔案不存在時退回套件版號
+    }
+  }
+
+  function getIndexHtml() {
+    var html = fs.readFileSync(path.join(rootDir, "index.html"), "utf8");
+    return html.replace(/(src|href)="([^"?]+)\?v=__ASSET_VER__/g, function (m, attr, p) {
+      return attr + '="' + p + "?v=" + assetVersion(p);
+    });
+  }
+
+  app.get("/", function (req, res) {
+    res.type("html").set("Cache-Control", "no-cache").send(getIndexHtml());
+  });
   app.get("/api/healthz", function (req, res) { res.type("text/plain").send("ok"); }); // /healthz 被 Google Frontend 保留，改用 /api/healthz
   app.get("/api/health", function (req, res) { res.json({ ok: true, version: config.VERSION }); });
 
@@ -48,14 +73,16 @@ function createServer(opts) {
 
   // /r/:roomId → SPA shell（client 從路由解析 roomId）
   app.get("/r/:roomId", function (req, res) {
-    res.sendFile(path.join(rootDir, "index.html"), { headers: { "Cache-Control": "no-cache" } });
+    res.type("html").set("Cache-Control", "no-cache").send(getIndexHtml());
   });
 
-  // 靜態檔：HTML 不快取（避免部署後拿到舊殼）、其他資產快取 1 小時（以 ?v= 版本控制）
+  // 靜態檔：HTML 不快取（避免部署後拿到舊殼）；帶 ?v= 內容雜湊的資產長快取
   app.use(express.static(rootDir, {
-    index: "index.html",
+    index: false,
     setHeaders: function (res, filePath) {
-      if (filePath.endsWith(".html")) res.setHeader("Cache-Control", "no-cache");
+      if (filePath.endsWith(".html")) { res.setHeader("Cache-Control", "no-cache"); return; }
+      var req = res.req;
+      if (req && req.query && req.query.v) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       else res.setHeader("Cache-Control", "public, max-age=3600");
     }
   }));

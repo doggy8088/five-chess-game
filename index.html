@@ -62,7 +62,8 @@
 }
 </script>
 
-<!-- 本地資產版本戳：更新 JS／CSS 時同步修改，避免瀏覽器沿用舊快取。 -->
+<!-- 資產版本：由伺服器於請求時注入「內容雜湊」（?v=<sha1-8>），JS/CSS 更新後 URL 自動改變，
+     瀏覽器不會再吃到舊快取；靜態託管時佔位符僅是普通查詢字串，不影響載入。 -->
 <link rel="icon" href="/favicon.ico" sizes="any" />
 <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
@@ -70,7 +71,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/assets/favicon-192.png" />
 <link rel="icon" type="image/png" sizes="512x512" href="/assets/favicon-512.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-<link rel="stylesheet" href="/styles.css?v=20260821-03" />
+<link rel="stylesheet" href="/styles.css?v=__ASSET_VER__" />
 
 <!-- three.js 是唯一的第三方資源，由 CDN 載入（不用 build、無本地相依）。
      若離線／被擋住時，頁面會自動改用 2D Canvas 渲染，確保始終可玩。 -->
@@ -365,13 +366,13 @@
   </div>
 </div>
 
-<script src="/game.js?v=20260821-03"></script>
-<script src="/assets/vendor/qrcode.min.js?v=20260821-03"></script>
-<script src="/shared/protocol.js?v=20260821-03"></script>
-<script src="/online/socket.js?v=20260821-03"></script>
-<script src="/online/tokens.js?v=20260821-03"></script>
-<script src="/online/session.js?v=20260821-03"></script>
-<script src="/app.js?v=20260821-03"></script>
-<script src="/online/ui.js?v=20260821-03"></script>
+<script src="/game.js?v=__ASSET_VER__"></script>
+<script src="/assets/vendor/qrcode.min.js?v=__ASSET_VER__"></script>
+<script src="/shared/protocol.js?v=__ASSET_VER__"></script>
+<script src="/online/socket.js?v=__ASSET_VER__"></script>
+<script src="/online/tokens.js?v=__ASSET_VER__"></script>
+<script src="/online/session.js?v=__ASSET_VER__"></script>
+<script src="/app.js?v=__ASSET_VER__"></script>
+<script src="/online/ui.js?v=__ASSET_VER__"></script>
 </body>
 </html>
