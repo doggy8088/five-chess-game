@@ -70,7 +70,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/assets/favicon-192.png" />
 <link rel="icon" type="image/png" sizes="512x512" href="/assets/favicon-512.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-<link rel="stylesheet" href="/styles.css?v=20260821-02" />
+<link rel="stylesheet" href="/styles.css?v=20260821-03" />
 
 <!-- three.js 是唯一的第三方資源，由 CDN 載入（不用 build、無本地相依）。
      若離線／被擋住時，頁面會自動改用 2D Canvas 渲染，確保始終可玩。 -->
@@ -94,6 +94,7 @@
    <div class="turn active" id="turn">
      <span class="dot stone-black" id="turn-dot"></span>
      <span class="who" id="turn-label">輪到黑棋</span>
+     <span id="turn-timer" class="turn-timer hidden"></span>
    </div>
 </div>
 
@@ -294,15 +295,10 @@
 </div>
 
 <!-- 對局中的線上元件 -->
+<span id="opponent-status" class="opponent-status hidden">對手已斷線</span>
 <div id="online-hud" class="hidden">
-  <div class="online-hud-left">
-    <span id="opponent-status" class="opponent-status hidden">對手已斷線</span>
-    <span id="turn-timer" class="turn-timer hidden"></span>
-  </div>
-  <div class="online-hud-right">
-    <button class="btn chat-btn" id="btn-chat" type="button" aria-label="開啟聊天室">💬<span id="chat-badge" class="badge hidden">0</span></button>
-    <button class="btn menu-btn" id="btn-online-menu" type="button" aria-label="線上對戰選單">⋯</button>
-  </div>
+  <button class="btn chat-btn" id="btn-chat" type="button" aria-label="開啟聊天室">💬<span id="chat-badge" class="badge hidden">0</span></button>
+  <button class="btn menu-btn" id="btn-online-menu" type="button" aria-label="線上對戰選單">⋯</button>
 </div>
 
 <div id="reconnect-overlay" class="hidden" role="alert">
@@ -369,12 +365,12 @@
   </div>
 </div>
 
-<script src="/game.js?v=20260821-02"></script>
-<script src="/shared/protocol.js?v=20260821-02"></script>
-<script src="/online/socket.js?v=20260821-02"></script>
-<script src="/online/tokens.js?v=20260821-02"></script>
-<script src="/online/session.js?v=20260821-02"></script>
-<script src="/app.js?v=20260821-02"></script>
-<script src="/online/ui.js?v=20260821-02"></script>
+<script src="/game.js?v=20260821-03"></script>
+<script src="/shared/protocol.js?v=20260821-03"></script>
+<script src="/online/socket.js?v=20260821-03"></script>
+<script src="/online/tokens.js?v=20260821-03"></script>
+<script src="/online/session.js?v=20260821-03"></script>
+<script src="/app.js?v=20260821-03"></script>
+<script src="/online/ui.js?v=20260821-03"></script>
 </body>
 </html>

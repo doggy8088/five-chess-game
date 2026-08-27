@@ -375,18 +375,18 @@ button.btn.danger{ background:rgba(255,90,77,0.18); border-color:rgba(255,90,77,
 .war-card-foot{ display:flex; align-items:center; justify-content:space-between; margin-top:10px;
   font-size:11.5px; color:var(--ink-dim); }
 
-/* 對局中的線上 HUD */
-#online-hud{ position:fixed; z-index:8; top:66px; left:50%; transform:translateX(-50%);
-  display:flex; align-items:center; gap:10px; max-width:94vw; }
-.online-hud-left{ display:flex; align-items:center; gap:8px; }
-.online-hud-right{ display:flex; gap:8px; }
-.opponent-status{ padding:7px 12px; border-radius:999px; font-size:12.5px; font-weight:700;
-  color:#ffb072; background:rgba(255,176,114,0.12); border:1px solid rgba(255,176,114,0.4); }
-.turn-timer{ padding:7px 12px; border-radius:999px; font-size:12.5px; font-weight:700;
-  color:var(--ink-dim); background:var(--panel); border:1px solid var(--panel-border);
-  font-variant-numeric:tabular-nums; }
-.turn-timer.urgent{ color:#ff8a75; border-color:rgba(255,122,89,0.55); }
-.turn-timer.grace{ color:#ffd166; border-color:rgba(255,209,102,0.45); }
+/* 對局中的線上 HUD：聊天／選單固定右上角；對手狀態在回合膠囊下方；倒數內嵌於回合膠囊 */
+#online-hud{ position:fixed; z-index:8; top:16px; right:16px;
+  display:flex; align-items:center; gap:8px; }
+.opponent-status{ position:fixed; z-index:8; top:134px; left:50%; transform:translateX(-50%);
+  padding:7px 14px; border-radius:999px; font-size:12.5px; font-weight:700; white-space:nowrap;
+  color:#ffb072; background:rgba(30,20,10,0.72); border:1px solid rgba(255,176,114,0.4);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+.turn-timer{ padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700;
+  color:var(--ink-dim); background:rgba(255,255,255,0.08);
+  font-variant-numeric:tabular-nums; white-space:nowrap; }
+.turn-timer.urgent{ color:#ff8a75; background:rgba(255,122,89,0.16); }
+.turn-timer.grace{ color:#ffd166; background:rgba(255,209,102,0.14); }
 .chat-btn, .menu-btn{ position:static; padding:8px 14px; border-radius:999px; font-size:15px; }
 .badge{ display:inline-block; min-width:18px; height:18px; line-height:18px; margin-left:4px;
   padding:0 5px; border-radius:999px; font-size:10.5px; font-weight:800; text-align:center;
@@ -475,7 +475,7 @@ body.mode-online #stats .row:nth-child(1), body.mode-online #stats .row:nth-chil
 
 @media (max-width:760px){
   #chat-drawer{ right:50%; transform:translateX(50%); top:auto; bottom:12px; width:94vw; height:70vh; }
-  #online-hud{ top:56px; flex-wrap:wrap; }
+  #opponent-status{ top:108px; max-width:86vw; }
   .online-screen{ padding:18px 10px; }
 }
 
