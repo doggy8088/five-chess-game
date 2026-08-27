@@ -547,6 +547,10 @@
        }
 
   function placeAt(pos) {
+      if (onlineMode) {
+        if (onlinePickHandler) onlinePickHandler(pos.x, pos.y);
+        return;
+        }
       if (game.isOver() || locked) return;
       var tp = game.currentPlayer();
       if (game.vsAI && tp !== game.humanPlayer) return;    // 輪到 AI
@@ -595,6 +599,7 @@
 
 
   function newGame() {
+      if (onlineMode) return; // 線上模式由伺服器驅動，不重置本地棋局
       var ap = vsAI ? (playerSide === "white" ? G.BLACK : G.WHITE) : null;
       game = G.createGame({ size: SIZE, vsAI: vsAI, aiPlayer: ap, difficulty: difficulty });
       undoUsed = 0;
@@ -1047,7 +1052,207 @@
         requestAI();
       }
       setTimeout(function () { els.hint.style.opacity = "0"; }, 6500);
+      initEntryScreen();
        }
+
+  /* ==================== 遊戲入口首頁 ====================
+   * 初始顯示入口（HTML 預設可見）；/r/:roomId 路徑則直接跳過（由線上流程接管）。 */
+
+  function entryEl() { return document.getElementById("screen-entry"); }
+
+  function hideEntry() {
+      var el = entryEl();
+      if (el) el.classList.add("hidden");
+      if (document.body) document.body.classList.remove("entry-open");
+       }
+
+  function showEntry() {
+      var el = entryEl();
+      if (el) el.classList.remove("hidden");
+      if (document.body) document.body.classList.add("entry-open");
+       }
+
+  function initEntryScreen() {
+      var el = entryEl();
+      if (!el) return;
+      var path = "";
+      try { path = (typeof location !== "undefined" && location.pathname) || ""; } catch (e) { path = ""; }
+      if (/^\/r\//.test(path)) {
+        // 邀請連結直入線上流程，跳過入口
+        hideEntry();
+        return;
+        }
+      if (document.body) document.body.classList.add("entry-open");
+      var btn = document.getElementById("btn-entry-local");
+      if (btn) btn.addEventListener("click", function () { hideEntry(); });
+      var homeBtn = document.getElementById("btn-game-home");
+      if (homeBtn) homeBtn.addEventListener("click", function () {
+        var confirmApi = window.GomokuConfirm;
+        if (confirmApi && typeof confirmApi.open === "function") {
+          confirmApi.open("回遊戲主畫面", "確定要離開目前的對局嗎？遊戲進度會保留，回到主畫面後可再點「開始遊戲」續玩。", "離開遊戲", function () { showEntry(); }, "繼續下棋");
+        } else {
+          showEntry();
+        }
+        });
+       }
+
+  /* ==================== 線上對戰整合（GomokuOnline API）====================
+   * 線上模式：本地鏡像 game 只做渲染；權威狀態來自伺服器。
+   * 點擊棋盤不直接落子，改呼叫 onlinePickHandler 由 OnlineSession 送出 action，
+   * 等 server actionApplied 才套用渲染。 */
+
+  var onlineMode = false;
+  var onlinePickHandler = null;
+  var onlineCtx = null;     // {mySeat, myColor, spectate, ruleset, blackSeat}
+  var renderedMoves = 0;
+
+  function refreshOnline() {
+      var tp = game.currentPlayer();
+      if (game.isOver()) {
+        els.turn.classList.remove("active");
+        els.turn.classList.add("result-prompt");
+        els.turnLabel.textContent = game.winner === "draw" ? "和棋" : "棋局結束";
+        }
+      else {
+        els.turn.classList.add("active");
+        els.turn.classList.remove("result-prompt");
+        els.turnDot.className = "dot " + (tp === G.BLACK ? "stone-black" : "stone-white");
+        var t;
+        if (onlineCtx && onlineCtx.spectate) t = (tp === G.BLACK ? "黑棋" : "白棋") + "落子中（觀戰）";
+        else if (tp === onlineCtx.myColor) t = "輪到你落子";
+        else t = "等待對手落子…";
+        els.turnLabel.textContent = t;
+        }
+
+      var bcnt = 0, wcnt = 0;
+      for (var i = 0; i < game.moves.length; i++) game.moves[i].player === G.BLACK ? bcnt++ : wcnt++;
+      els.sRound.textContent = "–";
+      els.sStones.textContent = (bcnt + wcnt) + " / " + (SIZE * SIZE);
+      els.sBlack.textContent = bcnt;
+      els.sWhite.textContent = wcnt;
+      els.sWinrate.textContent = "–";
+      els.sStreak.textContent = "–";
+      els.sStatus.textContent = "進行中";
+      els.sStatus.className = "v";
+      if (game.isOver()) {
+        if (game.winner === G.BLACK) { els.sStatus.textContent = "黑棋勝"; els.sStatus.className = "v status-win"; }
+        else if (game.winner === G.WHITE) { els.sStatus.textContent = "白棋勝"; els.sStatus.className = "v status-win"; }
+        else { els.sStatus.textContent = "和棋"; els.sStatus.className = "v status-draw"; }
+        }
+      var rulesetText = onlineCtx && onlineCtx.ruleset === "freestyle" ? "自由"
+        : onlineCtx && onlineCtx.ruleset === "renju" ? "連珠" : "標準";
+      els.sMode.textContent = onlineCtx && onlineCtx.spectate ? "線上觀戰（" + rulesetText + "）" : "線上對戰（" + rulesetText + "）";
+      }
+
+  function onlineRenderMove(mv, index, instant) {
+      view.place(mv.x, mv.y, mv.player, index + 1, instant);
+      }
+
+  function onlineApplyState(dto) {
+      if (!onlineMode) return;
+      var moves = dto.moves || [];
+      if (moves.length < renderedMoves) {
+        // 狀態回退（new game 等）：完整重建
+        view.reset();
+        view.clearMarks();
+        renderedMoves = 0;
+        }
+      // 鏡像本地 game：重放到最新
+      game = G.createGame({ size: dto.size || SIZE, vsAI: false, ruleset: dto.ruleset || "standard" });
+      for (var i = 0; i < moves.length; i++) {
+        var m = moves[i];
+        game.place(m.x, m.y, m.player);
+        }
+      // 對局結果（逾時/認輸/和棋等不反映在 moves 上）需從 DTO 還原
+      if (dto.winner != null) {
+        game.winner = dto.winner;
+        game.turn = null;
+        game.winLine = dto.winLine || null;
+      }
+      for (i = renderedMoves; i < moves.length; i++) onlineRenderMove(moves[i], i, renderedMoves === 0);
+      renderedMoves = moves.length;
+      var last = moves[moves.length - 1];
+      if (last) view.markLast(last.x, last.y);
+      if (game.winLine) view.markWin(game.winLine);
+      refreshOnline();
+      }
+
+  window.GomokuOnline = {
+      isActive: function () { return onlineMode; },
+      get ctx() { return onlineCtx; },
+      // 進入線上對戰畫面（重置盤面）
+      enter: function (opts) {
+        opts = opts || {};
+        onlineMode = true;
+        onlineCtx = {
+          mySeat: opts.mySeat === 0 || opts.mySeat === 1 ? opts.mySeat : null,
+          spectate: !!opts.spectate,
+          blackSeat: opts.blackSeat || 0,
+          ruleset: opts.ruleset || "standard"
+        };
+        onlineCtx.myColor = onlineCtx.mySeat === null ? null
+          : (onlineCtx.mySeat === onlineCtx.blackSeat ? G.BLACK : G.WHITE);
+        renderedMoves = 0;
+        game = G.createGame({ size: SIZE, vsAI: false, ruleset: onlineCtx.ruleset });
+        view.clearMarks();
+        view.reset();
+        hideOverlay();
+        document.body.classList.add("mode-online");
+        refreshOnline();
+        },
+      // 離開線上模式、還原本地遊戲
+      leave: function () {
+        onlineMode = false;
+        onlinePickHandler = null;
+        onlineCtx = null;
+        renderedMoves = 0;
+        document.body.classList.remove("mode-online");
+        hideOverlay();
+        newGame();
+        },
+      // 註冊線上落子 handler（返回 false 表示無法落子）
+      onPick: function (handler) { onlinePickHandler = handler; },
+      // 套用伺服器權威狀態（DTO）
+      applyState: function (dto) { onlineApplyState(dto); },
+      // 線上終局：用現有 overlay 顯示勝負
+      showResult: function (info) {
+        // info: {reasonText, winnerSeat, blackSeat, mySeat, moveNumber, canRematch}
+        var emoji = "🏆", title = "對戰結束", sub = info.reasonText || "";
+        if (info.winnerSeat === null || info.winnerSeat === undefined) {
+          title = "和局"; emoji = "🤝";
+          } else if (info.mySeat !== null && info.mySeat !== undefined && !info.spectate) {
+          title = info.winnerSeat === info.mySeat ? "你獲勝了！" : "你輸了這局";
+          emoji = info.winnerSeat === info.mySeat ? "🏆" : "💪";
+          } else {
+          title = info.winnerSeat === info.blackSeat ? "黑棋獲勝" : "白棋獲勝";
+          emoji = info.winnerSeat === info.blackSeat ? "⚫" : "⚪";
+          }
+        sub = (sub ? sub + " · " : "") + "共 " + (info.moveNumber || 0) + " 手";
+        els.ovEmoji.textContent = emoji;
+        els.ovTitle.textContent = title;
+        els.ovSub.textContent = sub;
+        if (view && view.hideMoveNumbers) view.hideMoveNumbers();
+        refreshOnline();
+        setTimeout(showOverlay, 350);
+        },
+      hideResult: hideOverlay,
+      refresh: function () { if (onlineMode) refreshOnline(); },
+      // 標記鏡像對局為已結束（逾時/認輸/和棋等不反映在 moves 上的終局）
+      markFinished: function (winnerColor, winLine) {
+        if (!onlineMode) return;
+        if (winnerColor === G.BLACK || winnerColor === G.WHITE) {
+          game.winner = winnerColor;
+          game.turn = null;
+          if (winLine && winLine.length) {
+            game.winLine = winLine;
+            view.markWin(winLine);
+          }
+          refreshOnline();
+        }
+      },
+      // 測試/除錯用
+      _renderedMoves: function () { return renderedMoves; }
+      };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
     else boot();

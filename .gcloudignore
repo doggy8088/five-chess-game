@@ -1,0 +1,7 @@
+# Cloud Build 上傳排除（加快部署）
+node_modules
+.git
+tests
+*.md
+.gcloudignore
+.DS_Store

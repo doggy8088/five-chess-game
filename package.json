@@ -1,13 +1,26 @@
 {
- "name": "five-chess-game",
- "version": "1.0.0",
- "description": "五子棋 / Gomoku — 3D three.js + pure CSS, 零依賴前端（僅 three.js CDN）。",
- "type": "commonjs",
- "scripts": {
-   "test": "node --test tests/*.test.js",
-   "coverage": "node --test --experimental-test-coverage tests/*.test.js",
-   "serve": "npx --yes serve -l 4321 ."
+  "name": "five-chess-game",
+  "version": "0.1.0",
+  "description": "五子棋 / Gomoku — 3D three.js + pure CSS，零依賴前端（僅 three.js CDN），內建線上即時對戰（Cloud Run）。",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test tests/*.test.js server/tests/*.test.js",
+    "coverage": "node --test --experimental-test-coverage tests/*.test.js server/tests/*.test.js",
+    "serve": "npx --yes serve -l 4321 .",
+    "dev": "FIRESTORE_ENABLED=0 node server/index.js",
+    "start": "node server/index.js",
+    "deploy": "bash deploy.sh"
   },
-  "keywords": ["gomoku", "五子棋", "five-in-a-row", "three.js"],
-  "license": "MIT"
+  "keywords": [
+    "gomoku",
+    "五子棋",
+    "five-in-a-row",
+    "three.js"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@google-cloud/firestore": "^9.0.0",
+    "express": "^5.2.1",
+    "ws": "^8.21.3"
+  }
 }

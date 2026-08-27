@@ -63,7 +63,14 @@
 </script>
 
 <!-- 本地資產版本戳：更新 JS／CSS 時同步修改，避免瀏覽器沿用舊快取。 -->
-<link rel="stylesheet" href="styles.css?v=20260819-01" />
+<link rel="icon" href="/favicon.ico" sizes="any" />
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+<link rel="icon" type="image/png" sizes="48x48" href="/assets/favicon-48x48.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/favicon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="/assets/favicon-512.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
+<link rel="stylesheet" href="/styles.css?v=20260821-02" />
 
 <!-- three.js 是唯一的第三方資源，由 CDN 載入（不用 build、無本地相依）。
      若離線／被擋住時，頁面會自動改用 2D Canvas 渲染，確保始終可玩。 -->
@@ -137,6 +144,8 @@
   <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
 </button>
 
+<button class="game-home-open" id="btn-game-home" type="button" aria-label="回遊戲主畫面" title="回遊戲主畫面">🏠 主畫面</button>
+
 <div id="hint">點擊棋盤落子 · 捲動縮放 · 拖曳旋轉棋盤 · 可切換難度</div>
 
 <div id="toast" role="status" aria-live="polite"></div>
@@ -150,6 +159,10 @@
      <h2 id="ov-title">黑棋獲勝</h2>
      <p id="ov-sub">五子連連</p>
      <div class="overlay-actions">
+       <button class="btn primary online-only" id="ov-rematch" type="button" hidden>
+         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3.5 7.1"/><path d="M3 22v-6h6"/></svg>
+         再來一局
+       </button>
        <button class="btn primary" id="ov-new" type="button">
          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3.5 7.1"/><path d="M3 22v-6h6"/></svg>
          新局
@@ -166,7 +179,202 @@
    </div>
 </div>
 
-<script src="game.js?v=20260819-01"></script>
-<script src="app.js?v=20260819-01"></script>
+<!-- ==================== 遊戲入口首頁 ==================== -->
+<section id="screen-entry">
+  <div class="entry-inner">
+    <div class="entry-brand">
+      <span class="entry-eyebrow">3D 線上五子棋</span>
+      <h1 class="entry-title">GOMOKU</h1>
+      <p class="entry-sub">五子棋 · 見賢思齊 — 與 AI 對弈，或邀請好友線上對戰</p>
+    </div>
+    <div class="entry-actions">
+      <button class="entry-btn primary" id="btn-entry-local" type="button">
+        <span class="entry-btn-icon" aria-hidden="true">♟️</span>
+        <span class="entry-btn-text"><strong>開始遊戲</strong><small>對戰 AI / 雙人同屏 · 3D 棋盤</small></span>
+      </button>
+      <button class="entry-btn online" id="btn-entry-online" type="button" hidden>
+        <span class="entry-btn-icon" aria-hidden="true">⚔️</span>
+        <span class="entry-btn-text"><strong>線上對戰</strong><small>邀請好友 · 即時觀戰 · 聊天室</small></span>
+      </button>
+      <p class="entry-offline-note" id="entry-offline-note" hidden>線上對戰需對戰伺服器 — 目前以單機模式執行</p>
+    </div>
+    <footer class="entry-footer">
+      <p class="entry-copyright">Copyright © 2026 <a href="https://www.facebook.com/will.fans/" target="_blank" rel="noopener noreferrer" aria-label="Will 保哥的 Facebook 粉絲專頁">Will 保哥</a></p>
+      <p class="entry-version">v0.1.0</p>
+    </footer>
+  </div>
+</section>
+
+<!-- ==================== 線上對戰層（探測到 /api/health 才啟用） ==================== -->
+<div id="online-layer" class="hidden">
+
+  <!-- 首頁：線上大廳 + 戰情中心 -->
+  <section id="screen-home" class="online-screen">
+    <div class="online-card home-card">
+      <div class="home-brand">
+        <h2>GOMOKU 線上對戰</h2>
+        <p>15×15 五子棋 · 建立房間邀請好友，或從戰情中心挑一場即時對局觀戰。</p>
+      </div>
+      <div class="home-actions">
+        <button class="btn primary big" id="btn-online-create" type="button">⚔️ 線上對戰</button>
+        <button class="btn big" id="btn-local-play" type="button">單機 / 對戰 AI</button>
+      </div>
+      <div id="war-center" class="war-center" hidden>
+        <div class="war-head">
+          <span class="war-title">即時戰況 · 戰情中心</span>
+          <span class="ws-badge off" id="ws-badge">連線中…</span>
+        </div>
+        <div class="war-stats">
+          <div class="war-stat"><span class="n" id="war-games">0</span><span class="k">進行戰局</span></div>
+          <div class="war-stat"><span class="n" id="war-players">0</span><span class="k">在線棋手</span></div>
+          <div class="war-stat"><span class="n" id="war-spectators">0</span><span class="k">即時觀戰</span></div>
+        </div>
+        <div id="war-list" class="war-list"></div>
+        <p class="war-empty" id="war-empty" hidden>目前沒有進行中的對局 — 建立一場吧！</p>
+      </div>
+      <footer class="online-footer">
+        <span id="online-version">五子棋 · Five Chess</span>
+      </footer>
+    </div>
+  </section>
+
+  <!-- 建立房間（規則集 + 暱稱） -->
+  <section id="screen-setup" class="online-screen hidden">
+    <div class="online-card">
+      <h2>建立對戰</h2>
+      <p class="form-hint">選擇規則集並輸入暱稱，建立房間後把邀請連結傳給對手。</p>
+      <div class="seg ruleset-seg" role="group" aria-label="規則集">
+        <button data-ruleset="freestyle" aria-pressed="false">自由</button>
+        <button data-ruleset="standard" aria-pressed="true">標準</button>
+        <button data-ruleset="renju" aria-pressed="false">連珠</button>
+      </div>
+      <p class="ruleset-desc" id="ruleset-desc">標準無禁五子棋：黑白對等，剛好五連才算勝。</p>
+      <label class="field">
+        <span>暱稱</span>
+        <input id="setup-name" type="text" maxlength="12" placeholder="玩家一" autocomplete="nickname" />
+      </label>
+      <div class="form-actions">
+        <button class="btn primary big" id="btn-create-room" type="button">建立房間</button>
+        <button class="btn" id="btn-setup-back" type="button">返回</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 加入 / 觀戰（暱稱） -->
+  <section id="screen-join" class="online-screen hidden">
+    <div class="online-card">
+      <h2 id="join-title">加入對戰</h2>
+      <p class="form-hint" id="join-hint"></p>
+      <label class="field">
+        <span>暱稱</span>
+        <input id="join-name" type="text" maxlength="12" placeholder="玩家二" autocomplete="nickname" />
+      </label>
+      <div class="form-actions">
+        <button class="btn primary big" id="btn-join-room" type="button">加入</button>
+        <button class="btn" id="btn-join-back" type="button">返回</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 等待對手（邀請連結 + QR） -->
+  <section id="screen-wait" class="online-screen hidden">
+    <div class="online-card wait-card">
+      <h2>等待對手加入…</h2>
+      <p class="form-hint">把邀請連結傳給對手，對方一進來就會自動開打。</p>
+      <div class="invite-row">
+        <input id="invite-url" type="text" readonly />
+        <button class="btn" id="btn-copy-invite" type="button">複製連結</button>
+      </div>
+      <canvas id="invite-qr" width="168" height="168" hidden></canvas>
+      <div class="form-actions">
+        <button class="btn" id="btn-wait-cancel" type="button">取消並返回</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- 對局中的線上元件 -->
+<div id="online-hud" class="hidden">
+  <div class="online-hud-left">
+    <span id="opponent-status" class="opponent-status hidden">對手已斷線</span>
+    <span id="turn-timer" class="turn-timer hidden"></span>
+  </div>
+  <div class="online-hud-right">
+    <button class="btn chat-btn" id="btn-chat" type="button" aria-label="開啟聊天室">💬<span id="chat-badge" class="badge hidden">0</span></button>
+    <button class="btn menu-btn" id="btn-online-menu" type="button" aria-label="線上對戰選單">⋯</button>
+  </div>
+</div>
+
+<div id="reconnect-overlay" class="hidden" role="alert">
+  <div class="reconnect-box">連線中斷，重新連線中…</div>
+</div>
+
+<!-- 聊天抽屜（聊天室 / 人員雙分頁） -->
+<div id="chat-drawer" class="hidden" role="dialog" aria-label="聊天室與人員名單">
+  <div class="drawer-head" id="drawer-head">
+    <div class="drawer-tabs" role="tablist">
+      <button class="drawer-tab active" id="tab-chat" role="tab" aria-selected="true" data-tab="chat">聊天室<span class="badge hidden" id="tab-chat-badge">0</span></button>
+      <button class="drawer-tab" id="tab-people" role="tab" aria-selected="false" data-tab="people">人員<span class="badge hidden" id="tab-people-badge">0</span></button>
+    </div>
+    <button class="drawer-close" id="drawer-close" type="button" aria-label="關閉聊天室">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="tab-pane" id="pane-chat" role="tabpanel">
+      <div class="chat-list" id="chat-list" aria-live="polite"></div>
+      <div class="chips" id="chat-chips"></div>
+      <form class="chat-form" id="chat-form">
+        <input id="chat-input" type="text" maxlength="120" placeholder="輸入訊息…" autocomplete="off" />
+        <button class="btn primary" type="submit">送出</button>
+      </form>
+    </div>
+    <div class="tab-pane hidden" id="pane-people" role="tabpanel">
+      <div class="people-section">
+        <h3>對戰玩家</h3>
+        <div id="people-players"></div>
+      </div>
+      <div class="people-section">
+        <h3>觀戰人員 <span id="people-spec-count">(0)</span></h3>
+        <div id="people-spectators"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 線上確認 / 提議 dialog -->
+<div id="online-dialog" class="hidden" role="dialog" aria-modal="true" aria-labelledby="od-title">
+  <div class="card">
+    <h2 id="od-title">確認</h2>
+    <p id="od-sub"></p>
+    <div class="overlay-actions">
+      <button class="btn primary" id="od-ok" type="button">確定</button>
+      <button class="btn" id="od-cancel" type="button">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 線上對戰選單 -->
+<div id="online-menu" class="hidden" role="dialog" aria-modal="true" aria-label="線上對戰選單">
+  <div class="card">
+    <h2>線上對戰選單</h2>
+    <div class="menu-list">
+      <button class="btn" id="menu-copy" type="button">🔗 複製邀請連結</button>
+      <button class="btn" id="menu-draw" type="button">🤝 提議和棋</button>
+      <button class="btn" id="menu-abort" type="button">🏳️ 結束對戰（不計勝負）</button>
+      <button class="btn" id="menu-resign" type="button">🏳️ 認輸</button>
+      <button class="btn danger" id="menu-leave" type="button">🚪 離開房間</button>
+    </div>
+    <div class="overlay-actions">
+      <button class="btn" id="menu-close" type="button">關閉</button>
+    </div>
+  </div>
+</div>
+
+<script src="/game.js?v=20260821-02"></script>
+<script src="/shared/protocol.js?v=20260821-02"></script>
+<script src="/online/socket.js?v=20260821-02"></script>
+<script src="/online/tokens.js?v=20260821-02"></script>
+<script src="/online/session.js?v=20260821-02"></script>
+<script src="/app.js?v=20260821-02"></script>
+<script src="/online/ui.js?v=20260821-02"></script>
 </body>
 </html>

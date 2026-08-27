@@ -1,8 +1,9 @@
-# 五子棋 · Gomoku（3D 對戰 AI）
+# 五子棋 · Gomoku（3D 對戰 AI + 線上對戰）
 
-> 3D 五子棋網頁遊戲：15×15 棋盤、三種難度 AI 對戰與雙人模式，three.js 3D 渲染，離線自動切換 2D Canvas，免安裝、免註冊，開啟即玩。
+> 3D 五子棋網頁遊戲：15×15 棋盤、三種難度 AI 對戰與雙人模式，three.js 3D 渲染，離線自動切換 2D Canvas，免安裝、免註冊，開啟即玩。內建**線上即時對戰**：房間邀請連結、回合鐘與斷線重連、聊天室、觀戰大廳，部署於 Google Cloud Run。
 
-- **線上試玩**：<https://five-chess-game.gh.miniasp.com/>
+- **線上試玩**：<https://gomoku.game.miniasp.com/>（Cloud Run）
+- **舊網址**：<https://five-chess-game.gh.miniasp.com/>（已 301/meta 重導向至 Cloud Run）
 - **原始碼**：<https://github.com/doggy8088/five-chess-game>
 - **作者**：[Will 保哥](https://www.facebook.com/will.fans/) · **授權**：MIT
 
@@ -11,11 +12,32 @@
 ## 目錄
 
 - [遊戲簡介](#遊戲簡介)
+- [線上對戰](#線上對戰)
 - [使用說明](#使用說明)
 - [遊戲規則](#遊戲規則)
 - [各模式規則對照](#各模式規則對照)
 - [開發與測試](#開發與測試)
+- [部署](#部署)
 - [專案結構](#專案結構)
+
+---
+
+## 線上對戰
+
+部署於 Cloud Run 的完整線上對戰系統（單一服務同時提供網站、REST API 與 WebSocket）：
+
+| 功能 | 說明 |
+|------|------|
+| **房間邀請** | 建立房間取得不可猜的邀請連結（`/r/{roomId}`），附 QR Code 與一鍵複製。 |
+| **座位系統** | 建立者執黑先手、第二人遞補白方自動開打；第三人起為觀眾（可聊天、可觀戰）。 |
+| **斷線重連** | 座位憑 `playerToken` 認領：同一連結重新打開即無縫續戰；WS 自動重連（指數退避）。 |
+| **回合鐘** | 每手 60 秒；輪到誰走誰斷線，鐘暫停並給 90 秒重連寬限；逾期判負（伺服器時間戳惰性判定，重啟不溯及判負）。 |
+| **協商功能** | 和棋、提前結束（不計勝負）、認輸、再來一局（重洗、換先手），皆需雙方同意。 |
+| **聊天室** | 雙分頁抽屜（聊天室＋人員名單）、12 句快速訊息、未讀徽章、限速防灌水、觀眾可聊天。 |
+| **戰情中心** | 首頁即時戰況：進行戰局、在線棋手、觀戰人數，一鍵進入觀戰（WS 推播＋HTTP 輪詢兜底）。 |
+| **規則集選擇** | 建立房間時選擇「自由／標準／連珠」，對局全程依該規則集裁決。 |
+
+> 純靜態部署（如 GitHub Pages）會自動探測不到對戰伺服器，此時線上功能整體隱藏、單機玩法不受影響。
 
 ---
 
@@ -152,21 +174,37 @@ npx serve .
 
 ### 技術棧
 
-- **遊戲邏輯**：`game.js` 為純邏輯模組（UMD，Node 與瀏覽器通用），無 DOM、無 three.js 相依，可獨立單元測試。
+- **遊戲邏輯**：`game.js` 為純邏輯模組（UMD，Node 與瀏覽器通用），無 DOM、無 three.js 相依，可獨立單元測試，**client 與 server 共用同一份規則引擎**。
 - **畫面渲染**：`app.js` 使用 three.js 進行 3D 渲染，並備有 2D Canvas 備援路徑。
-- **測試**：Node 內建測試框架（`node:test` / `node:assert`），無第三方測試套件。
+- **線上伺服器**：Node 22 + `express`（靜態檔＋REST）＋ `ws`（WebSocket `/ws`），單一 port；持久化用可插拔 `RoomStore`（本機 InMemory ↔ 正式 Firestore TTL）。
+- **測試**：Node 內建測試框架（`node:test` / `node:assert`），無第三方測試套件，涵蓋規則、伺服器行為（坐席／計時／聊天／協商）、整合（真實 HTTP＋WS）與客戶端通訊層。
 
 ### 指令
 
 ```bash
-# 執行單元與整合測試（game / app 2D / app 3D 路徑）
-node --test tests/*.test.js
+# 安裝依賴（僅 express、ws、@google-cloud/firestore）
+npm install
 
-# 起本地靜態伺服器預覽
+# 執行全部測試（規則 / 伺服器 / 整合 / 客戶端通訊）
+npm test
+
+# 起本地對戰伺服器（http://localhost:8787，InMemoryStore）
+npm run dev
+
+# 起純靜態伺服器（無線上功能，探測失敗自動隱藏）
 npm run serve
 ```
 
-> 說明：`package.json` 的 `test` / `coverage` 腳本使用 `node --test --coverage tests/` 目錄形式，部分 Node 版本需改用上述 glob 形式（`tests/*.test.js`）才能正確執行。測試涵蓋純邏輯、落子／勝負／禁手、AI 選著，以及 headless DOM 下的 2D／3D 整合路徑。
+### 本機開發線上對戰
+
+```bash
+npm install
+npm run dev          # http://localhost:8787（PORT 可用 env 覆寫）
+```
+
+開兩個瀏覽器分頁：第一個建立房間、把邀請連結貼到第二個瀏覽器即可對弈。
+
+> 說明：`package.json` 的 `test` / `coverage` 腳本以 glob 展開（`tests/*.test.js server/tests/*.test.js`）。
 
 ### AI 設計摘要
 
@@ -178,18 +216,68 @@ npm run serve
 
 ---
 
-## 專案結構
+## 部署
+
+部署到 Google Cloud Run（專案 `vertex-ai-sprint`、region `asia-east1`、服務名 `gomoku`）：
+
+```bash
+gcloud auth login
+bash deploy.sh        # 一鍵：啟用 API → Cloud Build → Cloud Run 部署 → Firestore TTL
+```
+
+手動部署（等價）：
+
+```bash
+gcloud run deploy gomoku \
+  --source . \
+  --project vertex-ai-sprint \
+  --region asia-east1 \
+  --session-affinity \      # WS 綁定同一實例
+  --timeout 3600 \
+  --min-instances 0 --max-instances 1 \  # 單實例讓記憶體 lobby 名單一致
+  --memory 512Mi \
+  --allow-unauthenticated \
+  --set-env-vars "FIRESTORE_ENABLED=1,FIRESTORE_COLLECTION=rooms"
+```
+
+- **持久化**：正式環境用 Firestore（`rooms/{roomId}` 一房一文件），重啟後房間可重建；`expireAt` 欄位搭配 collection TTL policy 自動清理（finished 房 24 小時、未結束房 7 天）。`FIRESTORE_ENABLED=0` 切回 InMemoryStore。
+- **環境變數**：`PORT`（Cloud Run 自帶）、`TURN_MS`（回合鐘，預設 60000）、`GRACE_MS`（斷線寬限，預設 90000）、`APP_VERSION`。
+- **健康檢查**：`/api/healthz` 回 `ok`；`/api/health` 回 `{ok, version}`。
+
+---
+
+### 專案結構
 
 ```
 .
 ├── index.html           # 頁面結構與 SEO 中繼資料
-├── game.js              # 純遊戲邏輯（UMD，可 Node 測試）
-├── app.js               # 畫面控制與渲染（3D three.js / 2D Canvas 備援）
+├── game.js              # 純遊戲邏輯（UMD，可 Node 測試，client/server 共用）
+├── app.js               # 畫面控制與渲染（3D three.js / 2D Canvas 備援）＋線上模式整合
 ├── styles.css           # 樣式
-├── tests/
-│   ├── game.test.js     # 純邏輯單元測試
-│   ├── app.smoke.test.js# 2D 路徑整合測試（headless DOM）
-│   └── app3d.test.js    # 3D 路徑整合測試（three.js 偽件）
+├── shared/
+│   └── protocol.js      # 線上協定共用型別、常數、文案（client/server 共用）
+├── online/              # 瀏覽器端線上模組
+│   ├── socket.js        #   ReconnectingSocket（指數退避重連）
+│   ├── session.js       #   OnlineSession（join 重送、seq、deadline 倒數）
+│   ├── tokens.js        #   座位 token localStorage
+│   └── ui.js            #   畫面路由、戰情中心、聊天 drawer、協商 dialog 黏合
+├── server/              # 線上對戰伺服器（Node 22 + express + ws）
+│   ├── index.js         #   HTTP API、SPA 路由、WS upgrade、心跳
+│   ├── room.js          #   房間本體（坐席、回合鐘、協商、聊天、presence）
+│   ├── rooms.js         #   RoomManager（快取、並發載入合併、lobby 推播、sweep）
+│   ├── guards.js        #   上行訊息白名窄化
+│   ├── ids.js / config.js
+│   ├── store.js         #   RoomStore 介面 + InMemoryStore
+│   ├── firestore-store.js # FirestoreStore（TTL）
+│   └── tests/           #   伺服器行為測試
+├── tests/               # 規則邏輯、headless DOM、整合（真實 HTTP+WS）、通訊層測試
+│   ├── game.test.js
+│   ├── app.smoke.test.js
+│   ├── app3d.test.js
+│   ├── online.test.js
+│   └── integration.test.js
+├── Dockerfile           # node:22-slim 生產映像
+├── deploy.sh            # 一鍵部署（Cloud Run + Firestore TTL）
 ├── og-image.png         # OpenGraph 分享圖
 ├── CNAME                # 自訂網域（five-chess-game.gh.miniasp.com）
 ├── robots.txt           # 搜尋引擎爬蟲規則

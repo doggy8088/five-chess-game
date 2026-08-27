@@ -88,6 +88,11 @@ function () {
     if (difficulty === "hard") return "renju";
     return "standard";
    }
+
+  // 禁手類型中文（server 與 client 共用文案）
+  function forbiddenTypeText(type) {
+    return type === "overline" ? "長連禁手" : type === "doubleFour" ? "四四禁手" : type === "doubleThree" ? "三三禁手" : "禁手";
+   }
     // 依規則集決定勝負連線：
     // freestyle：黑白長連（≥min）皆算勝；renju：白棋長連算勝、黑棋僅精準五連；
     // standard：黑白皆僅精準五連（剛好 min）。
@@ -831,6 +836,7 @@ function () {
       aiPlayer: aiPlayer,
       humanPlayer: aiPlayer === BLACK ? WHITE : BLACK,
       difficulty: opts.difficulty || "hard",
+      ruleset: opts.ruleset || rulesetFor(opts.difficulty || "hard"), // 線上房間可直接指定規則集
       round: 1,
       board: null,
       moves: [],
@@ -873,10 +879,10 @@ function () {
       player = player || game.turn;
       game.board[x][y] = player;
       game.moves.push({ x: x, y: y, player: player });
-      // 先五為勝：依難度規則集判勝——
+      // 先五為勝：依規則集判勝——
       // 自由（簡單）黑白長連皆勝；連珠（困難）白棋長連勝、黑棋僅精準五連；
       // 標準（中等）黑白皆僅精準五連（長連不算勝）。黑棋禁手僅在連珠規則下適用。
-      var ruleset = rulesetFor(game.difficulty);
+      var ruleset = game.ruleset;
       var line = winLineForRules(game.board, x, y, player, winLength, ruleset);
       if (line) {
         game.winner = player;
@@ -912,6 +918,24 @@ function () {
          }
       game.turn = opponentOf(player);
       return true;
+      };
+
+    // 純驗證：不變更狀態，回傳 {ok, message}（中文錯誤訊息，供 server 回 invalid）。
+    // 黑棋禁手首犯屬「可退回」動作：ok=false 且附 forbiddenWarn，再犯則為合法且直接判負。
+    game.validateMove = function (x, y, player) {
+      if (game.isOver()) return { ok: false, message: "對局已結束" };
+      if (!inBounds(game.size, x, y)) return { ok: false, message: "座標超出棋盤" };
+      player = player || game.turn;
+      if (player !== game.turn) return { ok: false, message: "還沒輪到你落子" };
+      if (!isLegalMove(game.board, x, y)) return { ok: false, message: "該位置已有棋子" };
+      if (player === BLACK && game.ruleset === "renju") {
+        var reason = forbiddenReason(game.board, x, y, BLACK, game.winLength, "renju");
+        if (reason) {
+          if (game.blackForbiddenWarned) return { ok: true, forbiddenLoss: reason };
+          return { ok: false, forbiddenWarn: { x: x, y: y, type: reason }, message: forbiddenTypeText(reason) + "：首次違規退回此手，請改下其他位置" };
+          }
+        }
+      return { ok: true };
       };
 
     game.aiMove = function () {
@@ -986,6 +1010,7 @@ function () {
   Game.winningFiveLine = winningFiveLine;
   Game.winLineForRules = winLineForRules;
   Game.rulesetFor = rulesetFor;
+  Game.forbiddenTypeText = forbiddenTypeText;
   Game.forbiddenReasonPlaced = forbiddenReasonPlaced;
   Game.forbiddenReason = forbiddenReason;
   Game.isForbiddenMove = isForbiddenMove;
@@ -1011,6 +1036,23 @@ function () {
   Game.minimax = minimax;
   Game.chooseMove = chooseMove;
   Game.createGame = createGame;
+
+  // 由 moves 陣列重建遊戲（server 持久化/客戶端狀態還原用）。
+  // opts: { size, ruleset, winLength, blackForbiddenWarned }；moves: [{x,y,player}]。
+  // 禁手首犯的手不會留在 moves 裡，故 blackForbiddenWarned 需另行帶入以精確重建。
+  Game.fromMoves = function (opts, moves) {
+    opts = opts || {};
+    var game = createGame({ size: opts.size || 15, winLength: opts.winLength, ruleset: opts.ruleset, vsAI: false });
+    // 禁手首犯的手不會留在 moves 裡；先還原旗標再重放，重放結果與原局一致。
+    game.blackForbiddenWarned = !!opts.blackForbiddenWarned;
+    moves = moves || [];
+    for (var i = 0; i < moves.length; i++) {
+      var m = moves[i];
+      var ok = game.place(m.x, m.y, m.player);
+      if (!ok) return null; // moves 序列不一致（理論上不會發生）
+      }
+    return game;
+   };
 
     return Game;
  });
