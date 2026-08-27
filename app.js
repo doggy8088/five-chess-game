@@ -1090,6 +1090,8 @@
       if (btn) btn.addEventListener("click", function () { hideEntry(); });
       var homeBtn = document.getElementById("btn-game-home");
       if (homeBtn) homeBtn.addEventListener("click", function () {
+        // 還沒落子：沒有任何進度，直接回主畫面不必確認
+        if (game.moves.length === 0) { showEntry(); return; }
         var confirmApi = window.GomokuConfirm;
         if (confirmApi && typeof confirmApi.open === "function") {
           confirmApi.open("回遊戲主畫面", "確定要離開目前的對局嗎？遊戲進度會保留，回到主畫面後可再點「開始遊戲」續玩。", "離開遊戲", function () { showEntry(); }, "繼續下棋");
