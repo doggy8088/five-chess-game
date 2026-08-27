@@ -212,13 +212,13 @@
   <!-- 首頁：線上大廳 + 戰情中心 -->
   <section id="screen-home" class="online-screen">
     <div class="online-card home-card">
+      <button class="btn back-btn" id="btn-back-home" type="button" aria-label="回遊戲主畫面">← 回主畫面</button>
       <div class="home-brand">
         <h2>GOMOKU 線上對戰</h2>
         <p>15×15 五子棋 · 建立房間邀請好友，或從戰情中心挑一場即時對局觀戰。</p>
       </div>
       <div class="home-actions">
-        <button class="btn primary big" id="btn-online-create" type="button">⚔️ 線上對戰</button>
-        <button class="btn big" id="btn-local-play" type="button">單機 / 對戰 AI</button>
+        <button class="btn primary big" id="btn-online-create" type="button">⚔️ 建立房間對戰</button>
       </div>
       <div id="war-center" class="war-center" hidden>
         <div class="war-head">
@@ -366,6 +366,7 @@
 </div>
 
 <script src="/game.js?v=20260821-03"></script>
+<script src="/assets/vendor/qrcode.min.js?v=20260821-03"></script>
 <script src="/shared/protocol.js?v=20260821-03"></script>
 <script src="/online/socket.js?v=20260821-03"></script>
 <script src="/online/tokens.js?v=20260821-03"></script>

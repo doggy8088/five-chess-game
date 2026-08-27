@@ -12,7 +12,7 @@
   var els = {
     layer: $("online-layer"), home: $("screen-home"), setup: $("screen-setup"),
     join: $("screen-join"), wait: $("screen-wait"),
-    btnCreate: $("btn-online-create"), btnLocal: $("btn-local-play"),
+    btnCreate: $("btn-online-create"),
     wsBadge: $("ws-badge"), warCenter: $("war-center"), warList: $("war-list"),
     warEmpty: $("war-empty"), warGames: $("war-games"), warPlayers: $("war-players"), warSpectators: $("war-spectators"),
     setupName: $("setup-name"), btnCreateRoom: $("btn-create-room"), btnSetupBack: $("btn-setup-back"),
@@ -1058,29 +1058,28 @@
   function openMenu() { syncMenuAvailability(); show(els.menu); }
   function closeMenu() { hide(els.menu); }
 
-  /* ==================== QR code（動態載入，失敗即藏）==================== */
+  /* ==================== QR code（本機打包 qrcode.min.js，無網路依賴）==================== */
 
-  var qrLoaded = false;
-  function loadQr(url) {
+  function drawQr(url) {
     els.qr.hidden = true;
-    function draw() {
-      if (!window.QRCode || !window.QRCode.toCanvas) { els.qr.hidden = true; return; }
-      try {
-        window.QRCode.toCanvas(els.qr, url, {
-          width: 168,
-          margin: 2,
-          color: { dark: "#201709", light: "#efe6d8" }
-        }, function (err) {
-          els.qr.hidden = !!err;
-        });
-      } catch (e) { els.qr.hidden = true; }
+    if (!window.QRCode || !window.QRCode.toCanvas) return; // 程式庫未載入：隱藏 QR
+    try {
+      window.QRCode.toCanvas(els.qr, url, {
+        width: 168,
+        margin: 2,
+        color: { dark: "#201709", light: "#efe6d8" }
+      }, function (err) {
+        els.qr.hidden = !!err;
+        if (err) console.error("[qr] 繪製失敗", err && err.message);
+      });
+    } catch (e) {
+      els.qr.hidden = true;
+      console.error("[qr] 繪製例外", e && e.message);
     }
-    if (qrLoaded && window.QRCode) { draw(); return; }
-    var script = document.createElement("script");
-    script.src = "https://unpkg.com/qrcode@1.5.4/build/qrcode.min.js";
-    script.onload = function () { qrLoaded = true; draw(); };
-    script.onerror = function () { els.qr.hidden = true; };
-    document.head.appendChild(script);
+  }
+
+  function loadQr(url) {
+    drawQr(url);
   }
 
   function copyInvite() {
@@ -1158,7 +1157,12 @@
 
   function wire() {
     els.btnCreate.addEventListener("click", openSetupScreen);
-    els.btnLocal.addEventListener("click", hideOnlineLayer);
+    var backHome = document.getElementById("btn-back-home");
+    if (backHome) backHome.addEventListener("click", function () {
+      // 回遊戲主畫面：收起線上層（含停止 lobby）並顯示入口首頁
+      hideOnlineLayer();
+      if (window.GomokuEntry && window.GomokuEntry.show) window.GomokuEntry.show();
+    });
     var entryOnline = document.getElementById("btn-entry-online");
     if (entryOnline) entryOnline.addEventListener("click", function () {
       if (!serverOk) { toast("線上對戰需要對戰伺服器，請改用單機模式"); return; }

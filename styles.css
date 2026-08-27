@@ -296,7 +296,7 @@ body.mode-online .game-home-open{ display:none; }
   -webkit-background-clip:text; background-clip:text; color:transparent; }
 .home-brand p{ margin:0 0 18px; color:var(--ink-dim); font-size:14px; line-height:1.6; }
 .home-actions{ display:flex; gap:10px; margin-bottom:22px; flex-wrap:wrap; }
-.home-actions .btn{ flex:1 1 200px; justify-content:center; }
+.home-actions .btn{ flex:1 1 100%; justify-content:center; }
 button.btn.big{ padding:14px 20px; font-size:16px; }
 button.btn.small{ padding:7px 12px; font-size:12.5px; }
 button.btn.danger{ background:rgba(255,90,77,0.18); border-color:rgba(255,90,77,0.45); color:#ffb3a8; }
@@ -472,6 +472,12 @@ body.mode-online #stats .row:nth-child(1), body.mode-online #stats .row:nth-chil
 #od-sub{ margin:0 0 18px; color:var(--ink-dim); font-size:14px; line-height:1.6; }
 .menu-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
 .menu-list .btn{ justify-content:flex-start; }
+
+/* 線上大廳回主畫面按鈕 */
+.back-btn{ align-self:flex-start; padding:7px 14px; font-size:12.5px; border-radius:999px;
+  color:var(--ink-dim); margin-bottom:14px; }
+.back-btn:hover{ color:#fff; border-color:var(--accent-2); }
+.home-actions .btn{ flex:1 1 100%; }
 
 @media (max-width:760px){
   #chat-drawer{ right:50%; transform:translateX(50%); top:auto; bottom:12px; width:94vw; height:70vh; }

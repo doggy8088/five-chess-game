@@ -1072,6 +1072,9 @@
       if (document.body) document.body.classList.add("entry-open");
        }
 
+  // 對外開放入口首頁顯示／收起（online/ui.js 的「回主畫面」用）
+  window.GomokuEntry = { show: showEntry, hide: hideEntry };
+
   function initEntryScreen() {
       var el = entryEl();
       if (!el) return;
