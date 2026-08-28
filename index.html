@@ -200,9 +200,27 @@
       </button>
       <p class="entry-offline-note" id="entry-offline-note" hidden>線上對戰需對戰伺服器 — 目前以單機模式執行</p>
     </div>
+    <!-- 即時戰況 · 戰情中心（探測到 /api/health 才顯示；位於 Footer 之前） -->
+    <div id="war-center" class="war-center" hidden>
+      <div class="war-head">
+        <div class="war-title-group">
+          <span class="war-radar-pulse" aria-hidden="true"></span>
+          <span class="war-title">即時戰況 · 戰情中心</span>
+          <span class="ws-badge off" id="ws-badge">連線中…</span>
+          <button id="btn-war-live-only" class="war-live-toggle" type="button" aria-pressed="false" aria-label="僅顯示交戰中的房間">只看交戰中</button>
+        </div>
+      </div>
+      <div class="war-stats">
+        <div class="war-stat"><span class="n" id="war-games">0</span><span class="k">進行戰局</span></div>
+        <div class="war-stat"><span class="n" id="war-players">0</span><span class="k">在線棋手</span></div>
+        <div class="war-stat"><span class="n" id="war-spectators">0</span><span class="k">即時觀戰</span></div>
+      </div>
+      <div id="war-list" class="war-list"></div>
+      <p class="war-empty" id="war-empty" hidden>目前沒有進行中的對局 — 建立一場吧！</p>
+    </div>
     <footer class="entry-footer">
       <p class="entry-copyright">Copyright © 2026 <a href="https://www.facebook.com/will.fans/" target="_blank" rel="noopener noreferrer" aria-label="Will 保哥的 Facebook 粉絲專頁">Will 保哥</a></p>
-      <p class="entry-version">v0.2.2</p>
+      <p class="entry-version">v0.2.3</p>
     </footer>
   </div>
 </section>
@@ -210,33 +228,16 @@
 <!-- ==================== 線上對戰層（探測到 /api/health 才啟用） ==================== -->
 <div id="online-layer" class="hidden">
 
-  <!-- 首頁：線上大廳 + 戰情中心 -->
+  <!-- 首頁：線上大廳（即時戰況 · 戰情中心已移至入口首頁 #screen-entry 底部） -->
   <section id="screen-home" class="online-screen">
     <div class="online-card home-card">
       <button class="btn back-btn" id="btn-back-home" type="button" aria-label="回遊戲主畫面">← 回主畫面</button>
       <div class="home-brand">
         <h2>GOMOKU 線上對戰</h2>
-        <p>15×15 五子棋 · 建立房間邀請好友，或從戰情中心挑一場即時對局觀戰。</p>
+        <p>15×15 五子棋 · 建立即時房間，邀請好友對戰；入口首頁的戰情中心可隨時觀戰。</p>
       </div>
       <div class="home-actions">
         <button class="btn primary big" id="btn-online-create" type="button">⚔️ 建立房間對戰</button>
-      </div>
-      <div id="war-center" class="war-center" hidden>
-        <div class="war-head">
-          <div class="war-title-group">
-            <span class="war-radar-pulse" aria-hidden="true"></span>
-            <span class="war-title">即時戰況 · 戰情中心</span>
-            <span class="ws-badge off" id="ws-badge">連線中…</span>
-            <button id="btn-war-live-only" class="war-live-toggle" type="button" aria-pressed="false" aria-label="僅顯示交戰中的房間">只看交戰中</button>
-          </div>
-        </div>
-        <div class="war-stats">
-          <div class="war-stat"><span class="n" id="war-games">0</span><span class="k">進行戰局</span></div>
-          <div class="war-stat"><span class="n" id="war-players">0</span><span class="k">在線棋手</span></div>
-          <div class="war-stat"><span class="n" id="war-spectators">0</span><span class="k">即時觀戰</span></div>
-        </div>
-        <div id="war-list" class="war-list"></div>
-        <p class="war-empty" id="war-empty" hidden>目前沒有進行中的對局 — 建立一場吧！</p>
       </div>
       <footer class="online-footer">
         <span id="online-version">五子棋 · Five Chess</span>

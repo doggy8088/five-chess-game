@@ -114,7 +114,7 @@
       if (n === name) show(el); else hide(el);
     });
     show(els.layer);
-    if (name === "home") startLobby(); else stopLobby();
+    syncLobby(); // 戰情中心（含公告頻道）跟著「入口首頁／線上大廳」顯示狀態啟停
   }
 
   // 入口首頁收起（app.js 預設顯示，線上流程接管時收起）
@@ -244,6 +244,7 @@
       var entryOnline = document.getElementById("btn-entry-online");
       if (entryOnline) entryOnline.hidden = false; // 入口首頁的線上對戰按鈕
       bootRoute();
+      syncLobby(); // 停在入口首頁時啟用戰情中心；/r/:roomId 直入房間則由後續流程接管
     }).catch(function () {
       serverOk = false; // 純靜態部署：隱藏整個線上功能
       var note = document.getElementById("entry-offline-note");
@@ -341,6 +342,19 @@
 
   /* ==================== 戰情中心 ==================== */
 
+  // 戰情中心位於入口首頁（#screen-entry）底部；線上層未開遊戲時也保持公告頻道
+  function entryVisible() {
+    var entry = document.getElementById("screen-entry");
+    return !!(entry && !entry.classList.contains("hidden"));
+  }
+
+  // lobby（戰情中心 WS + 公告頻道）：入口首頁或線上層任一畫面可見時啟用，進入對局即停
+  function syncLobby() {
+    if (!serverOk) return;
+    var layerVisible = !els.layer.classList.contains("hidden");
+    if (entryVisible() || layerVisible) startLobby(); else stopLobby();
+  }
+
   function startLobby() {
     if (!serverOk) return;
     els.warCenter.hidden = false;
@@ -385,7 +399,7 @@
     pollTimer = setInterval(function () {
       if (document.hidden) return;      // 頁面隱藏時暫停輪詢
       if (!wsDown) return;              // WS 通時以推播為準
-      if (els.home.classList.contains("hidden")) return; // 只在首頁輪詢
+      if (!entryVisible()) return;      // 只在戰情中心（入口首頁）輪詢
       fetchGames();
     }, 10_000);
   }
@@ -1485,10 +1499,17 @@
     // 頁面關閉/切換時通知 lobby 停止
     document.addEventListener("visibilitychange", function () {
       if (document.hidden && lobbySocket) return; // 保持連線，回來即可用
-      if (!document.hidden && !els.layer.classList.contains("hidden") && !$("screen-home").classList.contains("hidden")) {
-        startLobby(); // 已建立連線時內部會立即補一輪 HTTP
-      }
+      if (!document.hidden) syncLobby(); // 回到前景：依所在畫面啟停（回入口首頁立即補一輪 HTTP）
     });
+
+    // 入口首頁重新顯示（回主畫面）時，重啟戰情中心（app.js 的 showEntry 呼叫）
+    if (window.GomokuEntry && window.GomokuEntry.show) {
+      var origEntryShow = window.GomokuEntry.show;
+      window.GomokuEntry.show = function () {
+        origEntryShow();
+        syncLobby();
+      };
+    }
   }
 
   /* ==================== boot ==================== */
