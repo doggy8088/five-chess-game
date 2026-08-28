@@ -1,0 +1,309 @@
+/* =====================================================================
+ * 管理後台樣式 — 純 CSS（無預處理器）。
+ * 色票沿用前台 styles.css 的 :root 深色系（--bg-0/--bg-1/--panel…），
+ * 類別名稱與暗棋管理後台一致，方便對照維護。
+ * ===================================================================== */
+:root {
+  --admin-bg: #0b1020;              /* 前台 --bg-0 */
+  --admin-card: #141b31;            /* 前台 --bg-1 */
+  --admin-panel: rgba(22, 28, 51, 0.72);
+  --admin-border: rgba(140, 160, 220, 0.18);   /* 前台 --panel-border */
+  --admin-text: #eaf0ff;            /* 前台 --ink */
+  --admin-muted: #9fb0d4;           /* 前台 --ink-dim */
+  --admin-accent: #54d1ff;          /* 前台 --accent-2 */
+  --admin-accent-warm: #ff7a59;     /* 前台 --accent */
+  --admin-red: #ff6b5e;
+  --admin-green: #5be0a1;           /* 前台 --good */
+  --admin-warn: #f0b453;
+  --admin-max: 1280px;
+}
+
+* { box-sizing: border-box; }
+
+/* 彈性過捲動時露出的是 root 背景：沒設定會閃白底 */
+html {
+  background: var(--admin-bg);
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 700px at 15% -10%, rgba(84, 209, 255, 0.10), transparent 60%),
+    radial-gradient(1000px 700px at 110% 10%, rgba(255, 122, 89, 0.12), transparent 55%),
+    linear-gradient(160deg, var(--admin-bg), #141b31 60%, #0a0f1d);
+  background-attachment: fixed;
+  color: var(--admin-text);
+  font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+}
+
+/* ---------------- 頁首 ---------------- */
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 18px max(24px, calc((100% - var(--admin-max)) / 2 + 24px));
+  border-bottom: 1px solid var(--admin-border);
+  background: rgba(9, 12, 25, 0.55);
+}
+
+.admin-header h1 {
+  font-size: 20px;
+  margin: 0;
+  letter-spacing: 0.06em;
+  font-weight: 800;
+  background: linear-gradient(90deg, #ffffff, var(--admin-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.admin-subtitle { margin: 2px 0 0; font-size: 12px; color: var(--admin-muted); }
+
+.admin-user { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--admin-accent); }
+
+/* 管理員信箱預設模糊化，hover / 按住才顯示，避免旁人偷看 */
+#admin-email {
+  filter: blur(5px);
+  transition: filter 0.18s ease;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#admin-email:hover,
+#admin-email:active {
+  filter: none;
+}
+
+/* ---------------- 版面 ---------------- */
+.admin-main {
+  padding: 20px 24px 48px;
+  max-width: var(--admin-max);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 儀表板內的卡片（指標、公告、圖表）也要有間距 */
+#admin-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-card {
+  background: var(--admin-panel);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;               /* 前台 --radius */
+  padding: 18px 20px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);  /* 前台 --shadow */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.admin-card h2 { margin: 0 0 10px; font-size: 16px; color: var(--admin-accent); }
+
+.admin-hint { font-size: 12px; color: var(--admin-muted); margin: 4px 0; }
+.admin-hint.warn { color: var(--admin-warn); }
+
+/* ---------------- 登入卡 ---------------- */
+.login-card { max-width: 420px; margin: 40px auto; text-align: center; }
+.login-card h2 { margin-bottom: 4px; }
+#google-signin { display: flex; justify-content: center; min-height: 44px; margin-top: 14px; }
+
+/* ---------------- 即時指標卡 ---------------- */
+.admin-live-grid {
+  display: grid;
+  /* 8 張指標卡固定 2×4，避免 auto-fit 在寬螢幕排出 6+2 的缺口 */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .admin-live-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 480px) {
+  .admin-live-grid { grid-template-columns: 1fr; }
+}
+
+.admin-live-card {
+  background: rgba(9, 12, 25, 0.5);
+  border: 1px solid rgba(140, 160, 220, 0.16);
+  border-radius: 12px;
+  padding: 12px 14px;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.admin-live-card:hover { transform: translateY(-2px); border-color: rgba(140, 160, 220, 0.45); }
+
+.admin-live-top { display: flex; align-items: baseline; gap: 8px; }
+.admin-live-emoji { font-size: 17px; line-height: 1; }
+.admin-live-num { font-size: 26px; font-weight: 700; color: var(--admin-text); line-height: 1.2; }
+.admin-live-label { font-size: 12px; color: var(--admin-muted); margin-top: 2px; }
+.admin-live-status { font-size: 11.5px; margin-top: 4px; letter-spacing: 0.02em; }
+
+.admin-live-delta {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.admin-live-delta.up { color: var(--admin-green); }
+.admin-live-delta.down { color: var(--admin-red); opacity: 0.85; }
+
+.tone-ok .admin-live-status { color: var(--admin-green); }
+.tone-warn .admin-live-status { color: var(--admin-warn); }
+.tone-bad .admin-live-status { color: var(--admin-red); }
+.tone-muted .admin-live-status { color: var(--admin-muted); }
+
+/* 健康狀態同時映在卡片邊框上，一眼可辨識 */
+.tone-ok { border-color: rgba(91, 224, 161, 0.35); }
+.tone-warn { border-color: rgba(240, 180, 83, 0.35); }
+.tone-bad { border-color: rgba(255, 107, 94, 0.45); }
+
+/* ---------------- 控制列與輸入 ---------------- */
+.admin-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; font-size: 13px; }
+.admin-controls label { display: inline-flex; align-items: center; gap: 6px; color: var(--admin-muted); }
+
+.admin-controls select,
+.admin-controls input,
+#announcement-input {
+  background: rgba(9, 12, 25, 0.55);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  color: var(--admin-text);
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.admin-controls select:focus,
+.admin-controls input:focus,
+#announcement-input:focus {
+  outline: none;
+  border-color: var(--admin-accent);
+}
+
+#announcement-input { width: 100%; resize: vertical; margin-top: 6px; }
+
+.admin-actions-row { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+
+.ip-manual-row { margin-top: 12px; }
+
+#ip-manual-input { min-width: 220px; }
+
+/* ---------------- 按鈕 ---------------- */
+.admin-btn {
+  border-radius: 8px;
+  border: 1px solid var(--admin-border);
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--admin-text);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.admin-btn:hover { border-color: var(--admin-accent); }
+.admin-btn:disabled { opacity: 0.5; cursor: default; }
+
+.admin-btn.primary {
+  background: linear-gradient(160deg, var(--admin-accent-warm), #d9532f);
+  border-color: rgba(234, 240, 255, 0.25);
+  color: #fff;
+  font-weight: 600;
+}
+
+.admin-btn.ghost { color: var(--admin-muted); }
+
+/* 表格／名單內的小顆按鈕 */
+.admin-btn.small { padding: 3px 10px; font-size: 12px; }
+
+/* ---------------- 公告名單 ---------------- */
+.admin-announcement-list { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.admin-announcement-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(9, 12, 25, 0.45);
+  border: 1px solid rgba(140, 160, 220, 0.14);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.admin-announcement-text { margin: 0; white-space: pre-wrap; word-break: break-word; }
+
+.admin-announcement-meta { margin: 2px 0 0; font-size: 11px; color: var(--admin-muted); }
+
+.admin-announcement-reads { align-self: center; font-size: 12px; color: var(--admin-accent); white-space: nowrap; }
+
+canvas { max-width: 100%; }
+
+/* ---------------- IP 監控表格 ---------------- */
+.admin-table-wrap { overflow-x: auto; }
+
+.admin-ip-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.admin-ip-table th,
+.admin-ip-table td {
+  padding: 7px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(140, 160, 220, 0.12);
+  white-space: nowrap;
+}
+
+.admin-ip-table th { color: var(--admin-muted); font-weight: 600; font-size: 12px; }
+.admin-ip-table td.mono { font-family: ui-monospace, Menlo, monospace; letter-spacing: 0.02em; }
+.admin-ip-table tr.blocked-row td { background: rgba(255, 107, 94, 0.08); }
+
+.ip-status-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.ip-status-pill.ok { background: rgba(91, 224, 161, 0.15); color: var(--admin-green); }
+.ip-status-pill.blocked { background: rgba(255, 107, 94, 0.18); color: #ffa49b; }
+
+.ip-sub-heading { margin: 18px 0 8px; font-size: 14px; color: var(--admin-text); }
+
+.ip-alert-item { border-left: 3px solid var(--admin-red); }
+.ip-alert-type {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--admin-red);
+  margin-right: 8px;
+}
+
+.ip-block-item { border-left: 3px solid var(--admin-accent); }
+
+.admin-empty { color: var(--admin-muted); font-size: 12.5px; padding: 6px 0; list-style: none; }
+
+/* ---------------- 頁尾 ---------------- */
+.admin-footer {
+  text-align: center;
+  padding: 8px 24px 28px;
+  font-size: 12px;
+  color: var(--admin-muted);
+}
+
+.admin-footer p { margin: 0; }
+
+.admin-footer a {
+  color: var(--admin-accent);
+  text-decoration: none;
+}
+
+.admin-footer a:hover { text-decoration: underline; }

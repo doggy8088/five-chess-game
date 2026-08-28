@@ -30,9 +30,13 @@ function isLobbyListable(roomOrDoc, nowMs) {
 
 class RoomManager {
   // transport: { send(socketId, payload), close(socketId, code, reason) }
-  constructor(store, transport) {
+  // hooks（選配，後台用）：{ onAnnouncementAck(id, name), activeAnnouncement() }
+  //   - onAnnouncementAck：玩家回報公告已讀時呼叫（index.js 轉發）。
+  //   - activeAnnouncement：回傳當前生效公告 {id, text, at} 或 null；新 lobby 訂閱者先收到它。
+  constructor(store, transport, hooks) {
     this.store = store;
     this.transport = transport;
+    this.hooks = hooks || {};
     this.cache = new Map();        // roomId -> Room
     this.inFlight = new Map();     // roomId -> Promise<Room>
     this.writeChains = new Map();  // roomId -> Promise（每房寫入序列化）
@@ -96,6 +100,11 @@ class RoomManager {
 
   subscribeLobby(socketId) {
     this.lobbySubscribers.set(socketId, true);
+    // 新訂閱者先收到當前生效公告（若有），lobby 名單隨後送達。
+    var active = this.hooks && typeof this.hooks.activeAnnouncement === "function"
+      ? this.hooks.activeAnnouncement()
+      : null;
+    if (active) this.transport.send(socketId, { t: "announcement", id: active.id, text: active.text, at: active.at });
   }
 
   unsubscribeLobby(socketId) {
@@ -196,6 +205,26 @@ class RoomManager {
     var list = Array.from(summaries.values());
     list.sort(function (a, b) { return b.updatedAt - a.updatedAt; });
     return list.slice(0, limit);
+  }
+
+  /* ---- 後台監控 ---- */
+
+  // 即時房間統計（後台 gauge 用）：對局中/等待中房數、連線中坐席與觀眾數。
+  stats() {
+    var roomsPlaying = 0, roomsWaiting = 0, players = 0, spectators = 0;
+    this.cache.forEach(function (room) {
+      room.evaluate();
+      if (room.status === "playing") roomsPlaying++;
+      else if (room.status === "waiting") roomsWaiting++;
+      players += room.connectedPlayers();
+      spectators += room.spectators.size;
+    });
+    return { roomsPlaying: roomsPlaying, roomsWaiting: roomsWaiting, players: players, spectators: spectators };
+  }
+
+  // 全站廣播：fan-out 到快取中的每個房間（玩家 + 觀眾）。
+  announce(msg) {
+    this.cache.forEach(function (room) { room.announce(msg); });
   }
 
   /* ---- Sweep：finished 且無人連線的房間逐出快取（store 裡留到 TTL）---- */

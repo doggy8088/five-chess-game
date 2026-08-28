@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex,nofollow" />
+<meta name="theme-color" content="#0b1020" />
+<title>管理後台 · 五子棋</title>
+<!-- 內嵌 SVG favicon：五子棋風格（深色棋子＋「五」字） -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23141b31'/%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%2354d1ff' stroke-width='3'/%3E%3Ctext x='32' y='44' font-size='30' text-anchor='middle' fill='%23ff7a59' font-family='serif' font-weight='bold'%3E%E4%BA%94%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="/admin.css?v=__ASSET_VER__" />
+</head>
+<body>
+  <div id="admin-app">
+    <header class="admin-header">
+      <div>
+        <h1>五子棋 · 管理後台</h1>
+        <p class="admin-subtitle" id="admin-version"></p>
+      </div>
+      <div class="admin-user">
+        <span id="admin-email"></span>
+        <button id="btn-admin-logout" class="admin-btn ghost" type="button" hidden>🚪 登出</button>
+        <a id="btn-admin-home" class="admin-btn ghost" href="/" aria-label="回到前台首頁">🏠 回前台</a>
+      </div>
+    </header>
+
+    <main class="admin-main">
+      <!-- 登入 -->
+      <section id="admin-login" class="admin-card login-card" hidden>
+        <h2>以 Google 帳號登入</h2>
+        <p class="admin-hint">僅限管理員信箱（預設 doggy.huang@gmail.com）。</p>
+        <p id="admin-login-hint" class="admin-hint warn" hidden></p>
+        <div id="google-signin"></div>
+      </section>
+
+      <!-- 儀表板 -->
+      <section id="admin-dashboard" hidden>
+        <div class="admin-live-grid" id="admin-live-cards"></div>
+
+        <section class="admin-card">
+          <h2>📢 伺服器公告</h2>
+          <p class="admin-hint">發送後會即時推播到所有房間與大廳；玩家必須點擊「我知道了」才會關閉，下方可追蹤已讀人數。</p>
+          <textarea id="announcement-input" maxlength="500" rows="3" placeholder="輸入公告內容（最多 500 字）…"></textarea>
+          <div class="admin-actions-row">
+            <span id="announce-feedback" class="admin-hint"></span>
+            <button id="btn-announce-send" class="admin-btn primary" type="button">發送公告</button>
+          </div>
+          <ul id="announcement-list" class="admin-announcement-list"></ul>
+        </section>
+
+        <section class="admin-card">
+          <h2>每分鐘負載</h2>
+          <div class="admin-controls">
+            <label>範圍
+              <select id="minute-range">
+                <option value="60">最近 60 分鐘</option>
+                <option value="360">最近 6 小時</option>
+                <option value="1440">最近 24 小時</option>
+                <option value="4320">最近 72 小時</option>
+              </select>
+            </label>
+            <button id="btn-refresh-minute" class="admin-btn ghost" type="button">重新整理</button>
+          </div>
+          <canvas id="chart-minute" height="120"></canvas>
+        </section>
+
+        <section class="admin-card">
+          <h2>每小時報表</h2>
+          <div class="admin-controls">
+            <label>日期 <input type="date" id="hour-date" /></label>
+            <button class="admin-btn ghost" type="button" data-hour-shift="0">今天</button>
+            <button class="admin-btn ghost" type="button" data-hour-shift="-1">昨天</button>
+            <button class="admin-btn ghost" type="button" data-hour-shift="-7">上週</button>
+          </div>
+          <canvas id="chart-hour" height="120"></canvas>
+        </section>
+
+        <section class="admin-card">
+          <h2>每日報表</h2>
+          <div class="admin-controls">
+            <label>範圍
+              <select id="day-range">
+                <option value="7">最近 7 天</option>
+                <option value="14">最近 14 天</option>
+                <option value="30">最近 30 天</option>
+                <option value="90">最近 90 天</option>
+              </select>
+            </label>
+          </div>
+          <canvas id="chart-day" height="120"></canvas>
+        </section>
+
+        <section class="admin-card">
+          <h2>🛡️ IP 監控與封鎖</h2>
+          <p class="admin-hint" id="ip-thresholds"></p>
+          <div class="admin-controls">
+            <label>統計範圍
+              <select id="ip-range">
+                <option value="1h">最近 1 小時</option>
+                <option value="24h" selected>最近 24 小時</option>
+                <option value="7d">最近 7 天</option>
+              </select>
+            </label>
+            <label>封鎖時長
+              <select id="ip-block-duration">
+                <option value="5m">5 分鐘</option>
+                <option value="30m">30 分鐘</option>
+                <option value="1h">1 小時</option>
+                <option value="6h">6 小時</option>
+                <option value="24h">24 小時</option>
+                <option value="7d">7 天</option>
+                <option value="permanent">永久</option>
+              </select>
+            </label>
+            <button id="btn-ip-refresh" class="admin-btn ghost" type="button">重新整理</button>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-ip-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>IP</th><th>HTTP 請求</th><th>WS 訊息</th><th>WS 連線</th><th>目前連線</th><th>最近活動</th><th>狀態</th><th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="ip-top-body"></tbody>
+            </table>
+          </div>
+          <div class="admin-controls ip-manual-row">
+            <input id="ip-manual-input" placeholder="手動輸入 IP 位址…" />
+            <button id="btn-ip-block-manual" class="admin-btn primary" type="button">封鎖此 IP</button>
+            <span id="ip-feedback" class="admin-hint"></span>
+          </div>
+          <h3 class="ip-sub-heading">⚠️ 即時異常警示</h3>
+          <ul id="ip-alerts-list" class="admin-announcement-list"></ul>
+          <h3 class="ip-sub-heading">🔒 目前封鎖名單</h3>
+          <ul id="ip-blocks-list" class="admin-announcement-list"></ul>
+        </section>
+      </section>
+    </main>
+
+    <footer class="admin-footer">
+      <p>Copyright © 2026 <a href="https://www.facebook.com/will.fans/" target="_blank" rel="noopener noreferrer" aria-label="Will 保哥的 Facebook 粉絲專頁">Will 保哥</a> · <span id="admin-footer-version"></span></p>
+    </footer>
+  </div>
+  <script src="/assets/vendor/chart.umd.min.js?v=__ASSET_VER__"></script>
+  <script src="/admin.js?v=__ASSET_VER__"></script>
+</body>
+</html>

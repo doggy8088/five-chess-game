@@ -620,6 +620,11 @@ class Room {
     this._broadcast({ t: "presence", presence: this.presenceDTO() });
   }
 
+  // 全房廣播（玩家 + 觀眾）：全站公告用
+  announce(msg) {
+    this._broadcast(msg);
+  }
+
   _broadcast(payload) {
     var self = this;
     this.seatSockets.forEach(function (sid) { if (sid) self.emitSend(sid, payload); });
@@ -639,6 +644,13 @@ class Room {
     var n = 0;
     for (var s = 0; s < 2; s++) if (this.seatSockets[s]) n++;
     return n + this.spectators.size;
+  }
+
+  // 目前有連線的坐席數（後台 stats gauge 用）
+  connectedPlayers() {
+    var n = 0;
+    for (var s = 0; s < 2; s++) if (this.seatSockets[s]) n++;
+    return n;
   }
 
   isIdleFinished() {
