@@ -66,6 +66,8 @@
   var serverOk = false;
   var notifyTimer = null;
   var originalTitle = document.title;
+  var LOBBY_TITLE = "線上對戰 · 五子棋 五子連連"; // 線上大廳（含戰情中心）的頁面標題
+  var pushedOnline = false; // 本頁是否曾由「線上對戰」按鈕 push 過 /online（決定回主畫面能否走 history.back()）
   var confirmHandler = null;
   var confirmCancelHandler = null;
   var lastDeadlineInfo = null;
@@ -114,7 +116,8 @@
       if (n === name) show(el); else hide(el);
     });
     show(els.layer);
-    syncLobby(); // 戰情中心（含公告頻道）跟著「入口首頁／線上大廳」顯示狀態啟停
+    document.title = LOBBY_TITLE; // 線上大廳標題（回入口首頁由 goEntryHome 還原、進對局由 showGameView 還原）
+    syncLobby(); // 戰情中心（含公告頻道）跟著線上層顯示狀態啟停
   }
 
   // 入口首頁收起（app.js 預設顯示，線上流程接管時收起）
@@ -128,6 +131,7 @@
     hideEntryScreen();
     hide(els.layer);
     show(els.hud);
+    document.title = originalTitle; // 對局中還原原本標題（「輪到你」閃爍仍與 originalTitle 交替）
     stopLobby();
   }
 
@@ -137,7 +141,22 @@
     stopLobby();
   }
 
-  function leaveRoom() {
+  // 畫面位於線上大廳時同步 URL：若本頁 push 過 /online 就保留 state 旗標，
+  // 讓「回主畫面」能用 history.back() 走真正的上一頁（畫面切換統一交給 popstate）
+  function syncOnlineUrl() {
+    history.replaceState(pushedOnline ? { gomokuScreen: "online" } : null, "", "/online");
+  }
+
+  // 回到入口首頁：收起線上層與對局殘留、還原標題，顯示入口首頁
+  function goEntryHome() {
+    if (session) teardownRoom(); // 從房間直接返回（如瀏覽器上一頁）：先收掉線上連線與 HUD
+    hideOnlineLayer();
+    document.title = originalTitle;
+    if (window.GomokuEntry && window.GomokuEntry.show) window.GomokuEntry.show();
+  }
+
+  // 結束線上 session、清空房間 UI 與狀態（不動 history；畫面去向交給呼叫端決定）
+  function teardownRoom() {
     if (session) { session.dispose(); session = null; }
     currentRoomId = null;
     mySeat = null;
@@ -155,7 +174,11 @@
     els.ovRematch.hidden = true;
     document.title = originalTitle;
     window.GomokuOnline.leave();
-    history.replaceState(null, "", "/");
+  }
+
+  function leaveRoom() {
+    teardownRoom();
+    syncOnlineUrl(); // 畫面回到大廳：URL 同步為 /online
     showScreen("home");
   }
 
@@ -244,7 +267,7 @@
       var entryOnline = document.getElementById("btn-entry-online");
       if (entryOnline) entryOnline.hidden = false; // 入口首頁的線上對戰按鈕
       bootRoute();
-      syncLobby(); // 停在入口首頁時啟用戰情中心；/r/:roomId 直入房間則由後續流程接管
+      syncLobby(); // 依所在畫面啟停戰情中心（只有線上層可見時才會啟動）
     }).catch(function () {
       serverOk = false; // 純靜態部署：隱藏整個線上功能
       var note = document.getElementById("entry-offline-note");
@@ -262,10 +285,28 @@
     if (roomId) {
       hideEntryScreen(); // 邀請連結直入線上流程
       openRoomUrl(roomId);
+    } else if (location.pathname === "/online") {
+      showScreen("home"); // /online 深連結／重新整理：直接進線上大廳（URL 已正確，不再 pushState）
     } else if (location.search.indexOf("spectate=1") >= 0) {
       // 從戰情中心過來但路徑缺房號（罕見）：回 home
       showScreen("home");
     }
+  }
+
+  // 瀏覬器上一頁／下一頁：URL 已由瀏覽器改好，這裡只把畫面對齊 URL（不得再 push/replace）
+  function onPopState() {
+    var roomId = parseRoomFromPath();
+    if (roomId) {
+      openRoomUrl(roomId); // 前往／返回房間（同邀請深連結；有 token 靜默回座）
+      return;
+    }
+    if (location.pathname === "/online") {
+      if (session) teardownRoom(); // 從對局退回大廳：先結束房間連線
+      showScreen("home");
+      return;
+    }
+    pushedOnline = false; // 對應的 /online push 已被「上一頁」消費
+    goEntryHome(); // 核心需求：線上對戰按瀏覽器上一頁 → 回入口首頁
   }
 
   // /r/:roomId 開頁：有 token 就靜默重連，否則進暱稱頁
@@ -342,17 +383,11 @@
 
   /* ==================== 戰情中心 ==================== */
 
-  // 戰情中心位於入口首頁（#screen-entry）底部；線上層未開遊戲時也保持公告頻道
-  function entryVisible() {
-    var entry = document.getElementById("screen-entry");
-    return !!(entry && !entry.classList.contains("hidden"));
-  }
-
-  // lobby（戰情中心 WS + 公告頻道）：入口首頁或線上層任一畫面可見時啟用，進入對局即停
+  // lobby（戰情中心 WS + 公告頻道）：線上層任一畫面可見時啟用；進入對局或回入口首頁即停
   function syncLobby() {
     if (!serverOk) return;
     var layerVisible = !els.layer.classList.contains("hidden");
-    if (entryVisible() || layerVisible) startLobby(); else stopLobby();
+    if (layerVisible) startLobby(); else stopLobby();
   }
 
   function startLobby() {
@@ -393,13 +428,13 @@
     els.wsBadge.className = "ws-badge " + (up ? "on" : "off disconnected");
   }
 
-  // WS 推播為主；斷線時 10 秒 HTTP 輪詢備援（限首頁、前景、WS 未連上時）
+  // WS 推播為主；斷線時 10 秒 HTTP 輪詢備援（限線上層可見、前景、WS 未連上時）
   function startPolling() {
     if (pollTimer || !serverOk) return;
     pollTimer = setInterval(function () {
       if (document.hidden) return;      // 頁面隱藏時暫停輪詢
       if (!wsDown) return;              // WS 通時以推播為準
-      if (!entryVisible()) return;      // 只在戰情中心（入口首頁）輪詢
+      if (els.layer.classList.contains("hidden")) return; // 只在線上大廳（戰情中心所在）輪詢
       fetchGames();
     }, 10_000);
   }
@@ -956,7 +991,7 @@
     mySeat = null;
     window.GomokuOnline.leave();
     hide(els.hud);
-    history.replaceState(null, "", "/");
+    syncOnlineUrl(); // 畫面回大廳：URL 同步為 /online
     showScreen("home");
     openConfirm("找不到對局", "房間可能已結束或連結有誤，請建立新的對戰邀請。", "回到大廳", function () { }, "關閉");
   }
@@ -1388,20 +1423,27 @@
     els.btnCreate.addEventListener("click", openSetupScreen);
     var backHome = document.getElementById("btn-back-home");
     if (backHome) backHome.addEventListener("click", function () {
-      // 回遊戲主畫面：收起線上層（含停止 lobby）並顯示入口首頁
-      hideOnlineLayer();
-      if (window.GomokuEntry && window.GomokuEntry.show) window.GomokuEntry.show();
+      // 回遊戲主畫面：本頁 push 過 /online（state 旗標在）就交給 popstate 走真正的「上一頁」
+      if (history.state && history.state.gomokuScreen === "online") {
+        history.back();
+        return;
+      }
+      // 直接載入 /online（背後沒有本站歷史可退）：就地改回 / 並切換畫面
+      history.replaceState(null, "", "/");
+      goEntryHome();
     });
     var entryOnline = document.getElementById("btn-entry-online");
     if (entryOnline) entryOnline.addEventListener("click", function () {
       if (!serverOk) { toast("線上對戰需要對戰伺服器，請改用單機模式"); return; }
+      history.pushState({ gomokuScreen: "online" }, "", "/online"); // 讓瀏覽器上一頁能回入口首頁
+      pushedOnline = true;
       showScreen("home"); // showScreen 內部會收起入口首頁
     });
     els.btnCreateRoom.addEventListener("click", createRoom);
     els.btnSetupBack.addEventListener("click", function () { showScreen("home"); });
     els.btnJoinRoom.addEventListener("click", joinRoom);
     els.btnJoinBack.addEventListener("click", function () {
-      history.replaceState(null, "", "/");
+      syncOnlineUrl(); // 畫面回大廳：URL 同步為 /online
       showScreen("home");
     });
     els.btnCopy.addEventListener("click", copyInvite);
@@ -1499,17 +1541,11 @@
     // 頁面關閉/切換時通知 lobby 停止
     document.addEventListener("visibilitychange", function () {
       if (document.hidden && lobbySocket) return; // 保持連線，回來即可用
-      if (!document.hidden) syncLobby(); // 回到前景：依所在畫面啟停（回入口首頁立即補一輪 HTTP）
+      if (!document.hidden) syncLobby(); // 回到前景：依線上層顯示狀態啟停（大廳可見立即補一輪 HTTP）
     });
 
-    // 入口首頁重新顯示（回主畫面）時，重啟戰情中心（app.js 的 showEntry 呼叫）
-    if (window.GomokuEntry && window.GomokuEntry.show) {
-      var origEntryShow = window.GomokuEntry.show;
-      window.GomokuEntry.show = function () {
-        origEntryShow();
-        syncLobby();
-      };
-    }
+    // 瀏覽器上一頁／下一頁：依 URL 對齊畫面（入口首頁 ↔ 線上大廳 ↔ 房間）
+    window.addEventListener("popstate", onPopState);
   }
 
   /* ==================== boot ==================== */

@@ -290,13 +290,31 @@ body.mode-online .game-home-open{ display:none; }
 }
 .online-card h2{ margin:0 0 8px; font-size:22px; letter-spacing:.06em; }
 .online-card .form-hint{ margin:0 0 18px; color:var(--ink-dim); font-size:13.5px; line-height:1.6; }
-.home-card{ width:min(640px, 94vw); }
-.home-brand h2{ font-size:26px; margin-bottom:10px;
+.home-card{ width:min(760px, 96vw); }
+
+/* ---------------- 線上大廳（#screen-home） ---------------- */
+.lobby-topbar{ display:flex; justify-content:flex-start; }
+.home-brand{ margin-bottom:18px; }
+.home-eyebrow{
+  display:inline-block; padding:5px 12px; border-radius:999px;
+  border:1px solid rgba(84,209,255,0.35); background:rgba(84,209,255,0.10);
+  color:var(--accent-2); font-size:11px; font-weight:700; letter-spacing:.26em;
+  margin-bottom:12px;
+}
+.home-brand h2{ font-size:clamp(26px, 4.6vw, 34px); margin:0 0 10px; letter-spacing:.06em;
   background:linear-gradient(90deg,#fff,var(--accent-2));
   -webkit-background-clip:text; background-clip:text; color:transparent; }
-.home-brand p{ margin:0 0 18px; color:var(--ink-dim); font-size:14px; line-height:1.6; }
-.home-actions{ display:flex; gap:10px; margin-bottom:22px; flex-wrap:wrap; }
+.home-brand p{ margin:0; color:var(--ink-dim); font-size:14px; line-height:1.6; }
+.home-actions{ display:flex; gap:10px; margin:0 0 20px; flex-wrap:wrap; }
 .home-actions .btn{ flex:1 1 100%; justify-content:center; }
+/* 主 CTA：放大並加上暖色光暈，讓「建立房間」成為大廳視覺重心 */
+.home-actions .btn.primary.big{
+  padding:16px 22px; font-size:17px; font-weight:800; letter-spacing:.08em;
+  box-shadow:0 14px 34px rgba(255,122,89,0.30), 0 0 0 1px rgba(255,122,89,0.22);
+}
+.home-actions .btn.primary.big:hover{
+  box-shadow:0 20px 46px rgba(255,122,89,0.45), 0 0 0 1px rgba(255,122,89,0.45);
+}
 button.btn.big{ padding:14px 20px; font-size:16px; }
 button.btn.small{ padding:7px 12px; font-size:12.5px; }
 button.btn.danger{ background:rgba(255,90,77,0.18); border-color:rgba(255,90,77,0.45); color:#ffb3a8; }
@@ -329,10 +347,8 @@ button.btn.danger{ background:rgba(255,90,77,0.18); border-color:rgba(255,90,77,
 /* 戰情中心 */
 .online-footer{ margin-top:20px; padding-top:14px; border-top:1px solid var(--panel-border);
   font-size:12px; color:var(--ink-dim); text-align:center; }
-.war-center{ margin-top:22px; border:1px solid var(--panel-border); border-radius:14px; padding:16px;
+.war-center{ margin-top:0; border:1px solid var(--panel-border); border-radius:14px; padding:16px;
   background:rgba(9,13,25,0.45); }
-/* 戰情中心置於入口首頁（#screen-entry）底部、Footer 之前：寬度收斂並置中 */
-.entry-inner .war-center{ width:min(820px,100%); align-self:center; margin-top:0; }
 .war-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
 .war-title-group{ display:flex; align-items:center; gap:10px; min-width:0; flex-wrap:wrap; }
 .war-title{ font-weight:700; font-size:14px; letter-spacing:.08em; }
@@ -533,12 +549,15 @@ body.mode-online #stats .row:nth-child(1), body.mode-online #stats .row:nth-chil
 .back-btn{ align-self:flex-start; padding:7px 14px; font-size:12.5px; border-radius:999px;
   color:var(--ink-dim); margin-bottom:14px; }
 .back-btn:hover{ color:#fff; border-color:var(--accent-2); }
-.home-actions .btn{ flex:1 1 100%; }
 
 @media (max-width:760px){
   #chat-drawer{ right:50%; transform:translateX(50%); top:auto; bottom:12px; width:94vw; height:70vh; }
   #opponent-status{ top:108px; max-width:86vw; }
   .online-screen{ padding:18px 10px; }
+  .home-card{ padding:22px 16px; }
+  .war-center{ padding:14px; }
+  .war-stats{ gap:8px; }
+  .war-list{ max-height:46vh; }
 }
 
 /* =====================================================================

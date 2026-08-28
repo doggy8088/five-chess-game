@@ -228,6 +228,18 @@ test("整合：HTTP /api/games 只列滿座進行中對局；/r/:roomId 回 SPA"
   assert.ok(html.indexOf("app.js") >= 0, "回 SPA shell");
 });
 
+test("整合：/online 回 SPA shell（線上對戰深連結／重新整理）", async (t) => {
+  var built = await startServer();
+  t.after(function () { built.closeAll ? built.closeAll() : built.server.close(); });
+
+  var res = await fetch(built.base + "/online");
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("cache-control"), "no-cache");
+  var html = await res.text();
+  assert.ok(html.indexOf("app.js") >= 0, "回 SPA shell");
+  assert.ok(html.indexOf('id="screen-entry"') >= 0, "shell 內含入口首頁");
+});
+
 test("整合：/api/games 戰情中心曝光規則 — status 欄位、等待房 30 秒曝光、終局保留", async (t) => {
   var built = await startServer();
   t.after(function () { built.closeAll ? built.closeAll() : built.server.close(); });
