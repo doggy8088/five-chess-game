@@ -263,7 +263,7 @@
     }).then(function (data) {
       if (!data || !data.ok) throw new Error("bad payload");
       serverOk = true;
-      if (data.version) els.version.textContent = "五子棋 · Five Chess v" + data.version;
+      if (data.version) els.version.textContent = "v" + data.version;
       var entryOnline = document.getElementById("btn-entry-online");
       if (entryOnline) entryOnline.hidden = false; // 入口首頁的線上對戰按鈕
       bootRoute();
