@@ -6,20 +6,33 @@ PROJECT_ID="${PROJECT_ID:-vertex-ai-sprint}"
 REGION="${REGION:-asia-east1}"
 SERVICE="${SERVICE:-gomoku}"
 
-# 管理後台（/admin）所需環境變數，從本機環境帶入（留空則用安全預設）
+# 管理後台（/admin）所需環境變數，從本機環境帶入；未設定時沿用正式機現值，
+# 避免每次部署把 GOOGLE_CLIENT_ID / ADMIN_SESSION_SECRET 清空（secret 被清會全員被登出）。
 GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
 ADMIN_EMAILS="${ADMIN_EMAILS:-doggy.huang@gmail.com}"
 ADMIN_SESSION_SECRET="${ADMIN_SESSION_SECRET:-}"
+
+echo "==> 專案：$PROJECT_ID · 區域：$REGION · 服務：$SERVICE"
+
+gcloud config set project "$PROJECT_ID" 2>/dev/null
+
+if [ -z "$GOOGLE_CLIENT_ID" ] || [ -z "$ADMIN_SESSION_SECRET" ]; then
+  echo "==> 本機未設定後台環境變數，嘗試沿用正式機現值…"
+  CURRENT_ENV=$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" --region "$REGION" \
+    --format='value(spec.template.spec.containers[0].env)' 2>/dev/null || true)
+  if [ -z "$GOOGLE_CLIENT_ID" ] && echo "$CURRENT_ENV" | grep -q "GOOGLE_CLIENT_ID"; then
+    GOOGLE_CLIENT_ID=$(echo "$CURRENT_ENV" | tr ';' '\n' | grep "GOOGLE_CLIENT_ID" | sed -E "s/.*'value': '([^']*)'.*/\1/")
+  fi
+  if [ -z "$ADMIN_SESSION_SECRET" ] && echo "$CURRENT_ENV" | grep -q "ADMIN_SESSION_SECRET"; then
+    ADMIN_SESSION_SECRET=$(echo "$CURRENT_ENV" | tr ';' '\n' | grep "ADMIN_SESSION_SECRET" | sed -E "s/.*'value': '([^']*)'.*/\1/")
+  fi
+fi
 
 if [ -z "$GOOGLE_CLIENT_ID" ] || [ -z "$ADMIN_SESSION_SECRET" ]; then
   echo "==> ⚠️  警告：管理後台環境變數未設定齊全"
   [ -z "$GOOGLE_CLIENT_ID" ] && echo "    GOOGLE_CLIENT_ID 留空 → 後台 Google 登入需設定，未設將無法登入 /admin"
   [ -z "$ADMIN_SESSION_SECRET" ] && echo "    ADMIN_SESSION_SECRET 留空 → SESSION_SECRET 留空則重啟後 session 失效（全員被登出）"
 fi
-
-echo "==> 專案：$PROJECT_ID · 區域：$REGION · 服務：$SERVICE"
-
-gcloud config set project "$PROJECT_ID" 2>/dev/null
 
 echo "==> 啟用必要 API（run / firestore / cloudbuild）"
 gcloud services enable run.googleapis.com firestore.googleapis.com cloudbuild.googleapis.com --project "$PROJECT_ID"
