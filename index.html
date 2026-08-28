@@ -202,7 +202,7 @@
     </div>
     <footer class="entry-footer">
       <p class="entry-copyright">Copyright © 2026 <a href="https://www.facebook.com/will.fans/" target="_blank" rel="noopener noreferrer" aria-label="Will 保哥的 Facebook 粉絲專頁">Will 保哥</a></p>
-      <p class="entry-version">v0.1.1</p>
+      <p class="entry-version">v0.2.0</p>
     </footer>
   </div>
 </section>
@@ -223,8 +223,12 @@
       </div>
       <div id="war-center" class="war-center" hidden>
         <div class="war-head">
-          <span class="war-title">即時戰況 · 戰情中心</span>
-          <span class="ws-badge off" id="ws-badge">連線中…</span>
+          <div class="war-title-group">
+            <span class="war-radar-pulse" aria-hidden="true"></span>
+            <span class="war-title">即時戰況 · 戰情中心</span>
+            <span class="ws-badge off" id="ws-badge">連線中…</span>
+            <button id="btn-war-live-only" class="war-live-toggle" type="button" aria-pressed="false" aria-label="僅顯示交戰中的房間">只看交戰中</button>
+          </div>
         </div>
         <div class="war-stats">
           <div class="war-stat"><span class="n" id="war-games">0</span><span class="k">進行戰局</span></div>
@@ -362,6 +366,18 @@
     </div>
     <div class="overlay-actions">
       <button class="btn" id="menu-close" type="button">關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- 全站公告：強制閱讀 — 僅能以「我知道了」關閉（送出已讀回條） -->
+<div id="announcement-dialog" class="hidden" role="dialog" aria-modal="true" aria-label="伺服器公告">
+  <div class="card">
+    <h2>📢 伺服器公告</h2>
+    <p id="announcement-text" class="announcement-text"></p>
+    <p id="announcement-time" class="announcement-time"></p>
+    <div class="overlay-actions">
+      <button class="btn primary" id="btn-announcement-ack" type="button" aria-label="我知道了">我知道了</button>
     </div>
   </div>
 </div>

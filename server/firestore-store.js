@@ -4,6 +4,8 @@
    - expireAt 存 Timestamp，collection 開 TTL policy 自動刪：
      gcloud firestore fields ttls update expireAt --collection-group=rooms --enable-ttl */
 
+var rooms = require("./rooms.js");
+
 class FirestoreStore {
   constructor(opts) {
     opts = opts || {};
@@ -28,12 +30,22 @@ class FirestoreStore {
   }
 
   async listActive(limit) {
-    var q = await this.col
-      .where("status", "==", "playing")
-      .orderBy("updatedAt", "desc")
-      .limit(limit || 20)
+    // 戰情中心單一欄位查詢（不需複合索引，記憶體內排序）：
+    // 交戰中 + 保留期內的已結束房間都上板（等待房僅存在於快取，重啟後不從 store 撈）。
+    var snap = await this.col
+      .where("status", "in", ["playing", "finished"])
+      .limit(200)
       .get();
-    return q.docs.map(function (d) { return fromFirestoreDoc(d.data()); });
+    var now = Date.now();
+    var docs = [];
+    for (var i = 0; i < snap.docs.length; i++) {
+      var data = snap.docs[i].data();
+      if (data.version !== 1) continue;
+      var doc = fromFirestoreDoc(data);
+      if (rooms.isLobbyListable(doc, now)) docs.push(doc);
+    }
+    docs.sort(function (a, b) { return b.updatedAt - a.updatedAt; });
+    return docs.slice(0, limit || 20);
   }
 }
 

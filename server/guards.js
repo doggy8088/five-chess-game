@@ -74,6 +74,16 @@ function guardMessage(raw) {
       return out;
     }
 
+    case "announcementAck": {
+      // 公告 uuid：字串必填，剝除控制字元後截斷至上限，剝完為空視同不合法。
+      var ackId = typeof raw.id === "string"
+        ? raw.id.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, LIMITS.announcementAck)
+        : null;
+      if (!ackId) return null;
+      out.id = ackId;
+      return out;
+    }
+
     case "drawResponse":
     case "abortResponse":
     case "rematchResponse": {

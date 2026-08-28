@@ -15,6 +15,8 @@
     btnCreate: $("btn-online-create"),
     wsBadge: $("ws-badge"), warCenter: $("war-center"), warList: $("war-list"),
     warEmpty: $("war-empty"), warGames: $("war-games"), warPlayers: $("war-players"), warSpectators: $("war-spectators"),
+    warLiveOnly: $("btn-war-live-only"),
+    annDialog: $("announcement-dialog"), annText: $("announcement-text"), annTime: $("announcement-time"), annAck: $("btn-announcement-ack"),
     setupName: $("setup-name"), btnCreateRoom: $("btn-create-room"), btnSetupBack: $("btn-setup-back"),
     rulesetDesc: $("ruleset-desc"),
     joinTitle: $("join-title"), joinHint: $("join-hint"), joinName: $("join-name"),
@@ -57,6 +59,8 @@
   var unreadChat = 0;
   var unreadPeople = 0;
   var lastLobbySnapshot = null;
+  var lastLiveGames = [];
+  var warLiveOnly = false;          // 「只看交戰中」偏好（localStorage: warRoomLiveOnly）
   var pollTimer = null;
   var wsDown = false;
   var serverOk = false;
@@ -66,6 +70,8 @@
   var confirmCancelHandler = null;
   var lastDeadlineInfo = null;
   var yourTurnAlarm = false;
+  var ackedAnnouncements = {};      // 公告 id → true（localStorage: acknowledgedAnnouncements）
+  var annAckHandler = null;
 
   /* ==================== 工具 ==================== */
 
@@ -338,7 +344,10 @@
   function startLobby() {
     if (!serverOk) return;
     els.warCenter.hidden = false;
-    if (lobbySocket) return;
+    if (lobbySocket) {
+      fetchGames(); // 回到首頁／回到前景：立即補一輪 HTTP
+      return;
+    }
     lobbySocket = new window.ReconnectingSocket({
       onOpen: function () {
         wsDown = false;
@@ -346,7 +355,9 @@
         lobbySocket.send({ t: "subscribeLobby" });
       },
       onMessage: function (msg) {
-        if (msg && msg.t === "lobby") renderLobby(msg.games || []);
+        if (!msg) return;
+        if (msg.t === "lobby") renderLobby(msg.games || []);
+        else if (msg.t === "announcement") onAnnouncement(msg);
       },
       onDown: function () {
         wsDown = true;
@@ -365,14 +376,16 @@
 
   function setWsBadge(up) {
     els.wsBadge.textContent = up ? "即時連線中" : "重新連線中…";
-    els.wsBadge.className = "ws-badge " + (up ? "on" : "off");
+    els.wsBadge.className = "ws-badge " + (up ? "on" : "off disconnected");
   }
 
+  // WS 推播為主；斷線時 10 秒 HTTP 輪詢備援（限首頁、前景、WS 未連上時）
   function startPolling() {
     if (pollTimer || !serverOk) return;
     pollTimer = setInterval(function () {
       if (document.hidden) return;      // 頁面隱藏時暫停輪詢
       if (!wsDown) return;              // WS 通時以推播為準
+      if (els.home.classList.contains("hidden")) return; // 只在首頁輪詢
       fetchGames();
     }, 10_000);
   }
@@ -388,34 +401,125 @@
       .catch(function () { /* 忽略 */ });
   }
 
+  /* ---- 全站公告（WS: {t:"announcement", id, text, at} → 強制閱讀 → 已讀回條） ---- */
+
+  // 包一層 socket：攔截房間連線上的公告訊息，其餘原樣交給 session 路由
+  function AnnouncementSocket(opts) {
+    return new window.ReconnectingSocket({
+      onOpen: opts.onOpen,
+      onMessage: function (msg) {
+        if (msg && msg.t === "announcement") { onAnnouncement(msg); return; }
+        opts.onMessage(msg);
+      },
+      onDown: opts.onDown
+    });
+  }
+
+  function loadAckedAnnouncements() {
+    ackedAnnouncements = {};
+    try {
+      var stored = JSON.parse(localStorage.getItem("acknowledgedAnnouncements") || "[]");
+      if (Array.isArray(stored)) {
+        stored.forEach(function (id) { if (typeof id === "string") ackedAnnouncements[id] = true; });
+      }
+    } catch (e) { /* 資料損壞視同未讀 */ }
+  }
+
+  function markAnnouncementAcked(id) {
+    ackedAnnouncements[id] = true;
+    try {
+      // 只保留最近的 50 筆已讀紀錄
+      var ids = Object.keys(ackedAnnouncements);
+      if (ids.length > 50) ids = ids.slice(ids.length - 50);
+      localStorage.setItem("acknowledgedAnnouncements", JSON.stringify(ids));
+    } catch (e) { /* 儲存失敗不影響回條送出 */ }
+  }
+
+  // 已讀回條：房間連線與大廳連線都送（任一條送到即可）
+  function sendAnnouncementAck(id) {
+    var payload = { t: "announcementAck", id: id };
+    if (session && session.socket) session.socket.send(payload);
+    if (lobbySocket) lobbySocket.send(payload);
+  }
+
+  function onAnnouncement(msg) {
+    if (!msg || typeof msg.id !== "string" || !msg.id) return;
+    if (ackedAnnouncements[msg.id]) return; // 已讀過：不再打擾
+    showAnnouncementDialog(msg.text || "", msg.at, function () {
+      markAnnouncementAcked(msg.id);
+      sendAnnouncementAck(msg.id);
+    });
+  }
+
+  // 強制閱讀 dialog：沒有取消路徑，只能以「我知道了」關閉
+  function showAnnouncementDialog(text, at, onAck) {
+    if (!els.annDialog || !els.annAck) return;
+    els.annText.textContent = text;
+    var atMs = typeof at === "number" ? at : (at ? Date.parse(at) : NaN);
+    els.annTime.textContent = "發送於 " + (isNaN(atMs)
+      ? "未知時間"
+      : new Date(atMs).toLocaleString("zh-TW", { hour12: false }));
+    annAckHandler = onAck || null;
+    show(els.annDialog);
+  }
+
+  function closeAnnouncementDialog() {
+    if (!els.annDialog) return;
+    hide(els.annDialog);
+    annAckHandler = null;
+  }
+
   // ---END-OF-LOBBY---
 
   /* ==================== war cards 渲染 ==================== */
 
   function renderLobby(games) {
+    games = games || [];
+    lastLiveGames = games;
     var snapshot = JSON.stringify(games);
     var prev = null;
     try { prev = lastLobbySnapshot ? JSON.parse(lastLobbySnapshot) : null; } catch (e) { prev = null; }
     lastLobbySnapshot = snapshot;
 
-    els.warGames.textContent = String(games.length);
-    els.warPlayers.textContent = String(games.length * 2);
+    // 統計只算未結束的對局（已結束的僅在板上多留幾分鐘，不計入戰局／棋手數）
+    var playingCount = 0;
     var specTotal = 0;
-    games.forEach(function (g) { specTotal += g.spectators || 0; });
+    games.forEach(function (g) {
+      if ((g.status || "playing") !== "finished") playingCount++;
+      specTotal += g.spectators || 0;
+    });
+    els.warGames.textContent = String(playingCount);
+    els.warPlayers.textContent = String(playingCount * 2);
     els.warSpectators.textContent = String(specTotal);
 
-    // war cards
+    // 「只看交戰中」：只列交戰中的房間（統計數字維持全伺服器計算）
+    var visible = warLiveOnly
+      ? games.filter(function (g) { return (g.status || "playing") === "playing"; })
+      : games;
+
     els.warList.textContent = "";
-    games.forEach(function (g) {
+    if (visible.length === 0 && games.length > 0) {
+      var empty = document.createElement("div");
+      empty.className = "war-empty war-empty-inlist";
+      empty.textContent = "目前沒有交戰中的對局";
+      els.warList.appendChild(empty);
+    }
+    visible.forEach(function (g) {
       els.warList.appendChild(warCard(g, prev));
     });
     if (els.warEmpty) els.warEmpty.hidden = games.length > 0;
   }
 
   function warCard(g, prev) {
+    var status = g.status || "playing";
+    var isEnded = status === "finished";
+    var isWaiting = status === "waiting";
+
     var card = document.createElement("div");
     card.className = "war-card";
+    if (isEnded) card.classList.add("war-card-ended");
 
+    // 與上一輪快照比較：手數變了就閃一下
     var changed = prev && prev.some(function (old) {
       return old.roomId === g.roomId &&
         (old.turnNumber !== g.turnNumber || old.blackCount !== g.blackCount || old.whiteCount !== g.whiteCount);
@@ -428,36 +532,36 @@
     id.className = "war-roomid";
     id.textContent = roomIdTail(g.roomId);
     head.appendChild(id);
-    var live = document.createElement("span");
-    live.className = "war-live";
-    live.textContent = "交戰中";
-    head.appendChild(live);
-    var tag = document.createElement("span");
-    tag.className = "war-tag";
-    tag.textContent = warTag(g);
-    if (tag.textContent) head.appendChild(tag);
-    var eyes = document.createElement("span");
-    eyes.className = "war-specs";
-    eyes.textContent = "👁️ " + (g.spectators || 0);
-    head.appendChild(eyes);
+
+    var tags = document.createElement("div");
+    tags.className = "war-card-tags";
+    tags.appendChild(warStatusTag(g));
+    var heat = warHeatTag(g);
+    if (heat) tags.appendChild(heat);
+    if ((g.spectators || 0) > 0) {
+      var specTag = document.createElement("span");
+      specTag.className = "war-tag war-tag-spec";
+      specTag.textContent = "👁️ " + g.spectators;
+      tags.appendChild(specTag);
+    }
+    head.appendChild(tags);
     card.appendChild(head);
 
     var duel = document.createElement("div");
     duel.className = "war-duel";
-    duel.appendChild(warPlayer(g.players[0], "black", g.blackCount, "黑方"));
+    duel.appendChild(warPlayer(g.players[0], "black", g.blackCount, "黑方", isWaiting));
     var vs = document.createElement("div");
     vs.className = "war-vs";
-    vs.innerHTML = ""; // textContent only
     var vsTxt = document.createElement("div");
     vsTxt.className = "vs-mark";
     vsTxt.textContent = "VS";
     var turnTxt = document.createElement("div");
     turnTxt.className = "vs-turn";
-    turnTxt.textContent = "第 " + g.turnNumber + " 手";
+    turnTxt.textContent = isWaiting ? "等待開局" : "第 " + g.turnNumber + " 手";
     vs.appendChild(vsTxt);
     vs.appendChild(turnTxt);
     duel.appendChild(vs);
-    duel.appendChild(warPlayer(g.players[1], "white", g.whiteCount, "白方"));
+    duel.appendChild(warPlayer(g.players[1], "white", g.whiteCount, "白方", isWaiting));
     card.appendChild(duel);
 
     var balance = document.createElement("div");
@@ -473,28 +577,78 @@
     balance.appendChild(bar);
     var balanceText = document.createElement("div");
     balanceText.className = "balance-text";
-    balanceText.textContent = "黑方 " + g.blackCount + " 子 · 白方 " + g.whiteCount + " 子";
+    balanceText.textContent = isWaiting ? "靜候對手入座" : "黑方 " + g.blackCount + " 子 · 白方 " + g.whiteCount + " 子";
     balance.appendChild(balanceText);
     card.appendChild(balance);
 
     var foot = document.createElement("div");
     foot.className = "war-card-foot";
     var footInfo = document.createElement("span");
-    footInfo.textContent = "已下 " + (g.blackCount + g.whiteCount) + " 子 · 黑 " + g.blackCount + " / 白 " + g.whiteCount;
+    if (isWaiting) {
+      var waited = g.createdAt ? Math.max(1, Math.floor((Date.now() - g.createdAt) / 1000)) : null;
+      footInfo.textContent = waited != null ? "已等待 " + waited + " 秒 · 點擊直接加入" : "點擊直接加入";
+    } else if (isEnded) {
+      footInfo.textContent = "終局 · 共 " + g.turnNumber + " 手";
+    } else {
+      footInfo.textContent = "已下 " + (g.blackCount + g.whiteCount) + " 子 · 黑 " + g.blackCount + " / 白 " + g.whiteCount;
+    }
     foot.appendChild(footInfo);
     var btn = document.createElement("button");
     btn.className = "btn small";
     btn.type = "button";
-    btn.textContent = "進入觀戰";
+    btn.textContent = isWaiting ? "加入對戰" : (isEnded ? "觀看棋局" : "進入觀戰");
+    if (isWaiting) btn.classList.add("primary");
     btn.addEventListener("click", function () {
-      goSpectate(g.roomId);
+      if (isWaiting) goJoinRoom(g.roomId); else goSpectate(g.roomId);
     });
     foot.appendChild(btn);
     card.appendChild(foot);
     return card;
   }
 
-  function warPlayer(player, side, count, label) {
+  // 狀態標籤：等待加入（有呼吸點）／交戰中（有呼吸點）／🏁 已結束
+  function warStatusTag(g) {
+    var status = g.status || "playing";
+    var tag = document.createElement("span");
+    if (status === "waiting") {
+      tag.className = "war-tag war-tag-wait";
+      var dot = document.createElement("span");
+      dot.className = "war-dot";
+      dot.setAttribute("aria-hidden", "true");
+      tag.appendChild(dot);
+      tag.appendChild(document.createTextNode("等待加入"));
+    } else if (status === "finished") {
+      tag.className = "war-tag war-tag-ended";
+      tag.textContent = "🏁 已結束";
+    } else {
+      tag.className = "war-tag war-tag-live";
+      var liveDot = document.createElement("span");
+      liveDot.className = "war-dot";
+      liveDot.setAttribute("aria-hidden", "true");
+      tag.appendChild(liveDot);
+      tag.appendChild(document.createTextNode("交戰中"));
+    }
+    return tag;
+  }
+
+  // 標籤：膠著🔥（手數≥20 且黑白子差 ≤2）／激戰⚔️（手數≥40）；等待／終局不套用
+  function warHeatTag(g) {
+    var status = g.status || "playing";
+    if (status !== "playing") return null;
+    var tag = document.createElement("span");
+    if (g.turnNumber >= 40) {
+      tag.className = "war-tag war-tag-fierce";
+      tag.textContent = "⚔️ 激戰";
+    } else if (g.turnNumber >= 20 && Math.abs(g.blackCount - g.whiteCount) <= 2) {
+      tag.className = "war-tag war-tag-tight";
+      tag.textContent = "🔥 膠著";
+    } else {
+      return null;
+    }
+    return tag;
+  }
+
+  function warPlayer(player, side, count, label, isWaiting) {
     var box = document.createElement("div");
     box.className = "war-player " + side;
     var dot = document.createElement("span");
@@ -503,21 +657,19 @@
     var info = document.createElement("div");
     var nm = document.createElement("div");
     nm.className = "war-player-name";
-    nm.textContent = (player && player.name) || "（等待中）";
+    var name = player && player.name;
+    nm.textContent = name || (isWaiting && side === "white" ? "等待加入" : "（等待中）");
     info.appendChild(nm);
     var sub = document.createElement("div");
     sub.className = "war-player-sub";
-    sub.textContent = player && player.name ? label + " · " + count + " 子" : "陣營待定";
+    if (!name) {
+      sub.textContent = isWaiting ? "等你來挑戰" : "陣營待定";
+    } else {
+      sub.textContent = label + " · " + count + " 子";
+    }
     info.appendChild(sub);
     box.appendChild(info);
     return box;
-  }
-
-  // 標籤：膠著🔥（手數≥10 且黑白平衡）／激戰⚔️（手數≥30）
-  function warTag(g) {
-    if (g.turnNumber >= 30) return "激戰 ⚔️";
-    if (g.turnNumber >= 10 && g.blackCount === g.whiteCount) return "膠著 🔥";
-    return "";
   }
 
   function goSpectate(roomId) {
@@ -525,6 +677,14 @@
     currentRoomId = roomId;
     spectate = true;
     openOnlineSession(roomId, { playerToken: window.OnlineTokens.loadToken(roomId), name: window.OnlineTokens.loadName() || "觀眾", spectate: true });
+  }
+
+  // 從戰情中心直接加入等待中的房間（坐滿為止，帶 token 可靜默回座）
+  function goJoinRoom(roomId) {
+    history.replaceState(null, "", "/r/" + roomId);
+    currentRoomId = roomId;
+    spectate = false;
+    openOnlineSession(roomId, { playerToken: window.OnlineTokens.loadToken(roomId), name: window.OnlineTokens.loadName() || "玩家二", spectate: false });
   }
 
   // ---END-OF-WAR---
@@ -543,6 +703,7 @@
       playerToken: opts.playerToken || null,
       name: opts.name || null,
       spectate: !!opts.spectate,
+      socketClass: AnnouncementSocket, // 攔截房間連線上的公告訊息
       onJoined: onJoined,
       onState: onServerState,
       onActionApplied: onActionApplied,
@@ -1248,6 +1409,26 @@
       if (fn) fn(); // 協商婉拒也需回應對方
     });
 
+    // 全站公告：唯一關閉路徑 =「我知道了」（送已讀回條）
+    els.annAck.addEventListener("click", function () {
+      var fn = annAckHandler;
+      closeAnnouncementDialog();
+      if (fn) fn();
+    });
+
+    // 「只看交戰中」開關（偏好存 localStorage）
+    if (els.warLiveOnly) {
+      try { warLiveOnly = JSON.parse(localStorage.getItem("warRoomLiveOnly") || "false") === true; } catch (e) { warLiveOnly = false; }
+      var syncLiveOnly = function () { els.warLiveOnly.setAttribute("aria-pressed", String(warLiveOnly)); };
+      syncLiveOnly();
+      els.warLiveOnly.addEventListener("click", function () {
+        warLiveOnly = !warLiveOnly;
+        syncLiveOnly();
+        try { localStorage.setItem("warRoomLiveOnly", JSON.stringify(warLiveOnly)); } catch (e) { /* 無法保存也照常運作 */ }
+        renderLobby(lastLiveGames); // 用最後一份名單立即重渲染
+      });
+    }
+
     // 聊天 drawer
     els.btnChat.addEventListener("click", function () {
       if (drawerOpen) closeDrawer(); else openDrawer();
@@ -1304,8 +1485,8 @@
     // 頁面關閉/切換時通知 lobby 停止
     document.addEventListener("visibilitychange", function () {
       if (document.hidden && lobbySocket) return; // 保持連線，回來即可用
-      if (!document.hidden && !lobbySocket && !els.layer.classList.contains("hidden") && !$("screen-home").classList.contains("hidden")) {
-        startLobby();
+      if (!document.hidden && !els.layer.classList.contains("hidden") && !$("screen-home").classList.contains("hidden")) {
+        startLobby(); // 已建立連線時內部會立即補一輪 HTTP
       }
     });
   }
@@ -1318,6 +1499,7 @@
   function boot() {
     buildChips();
     wire();
+    loadAckedAnnouncements();
     probeHealth();
   }
 

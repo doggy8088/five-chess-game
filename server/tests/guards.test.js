@@ -59,3 +59,17 @@ test("guards：無欄位訊息直接放行", () => {
     assert.deepEqual(guardMessage({ t: t }), { t: t });
   });
 });
+
+test("guards：announcementAck 驗 id 字串、剝控制字元、截斷 64", () => {
+  var ok = guardMessage({ t: "announcementAck", id: "6f9c1e5a-1234-4abc-9def-0123456789ab" });
+  assert.deepEqual(ok, { t: "announcementAck", id: "6f9c1e5a-1234-4abc-9def-0123456789ab" });
+
+  var long = guardMessage({ t: "announcementAck", id: "i".repeat(100) });
+  assert.equal(long.id.length, 64);
+
+  assert.equal(guardMessage({ t: "announcementAck", id: 42 }), null, "id 非字串");
+  assert.equal(guardMessage({ t: "announcementAck" }), null, "缺 id");
+  assert.equal(guardMessage({ t: "announcementAck", id: "" }), null, "空 id");
+  assert.equal(guardMessage({ t: "announcementAck", id: "\u0007" }), null, "剝除控制字元後為空");
+  assert.equal(guardMessage({ t: "announcementAck", id: "ab\u0007cd" }).id, "abcd", "控制字元被剝除");
+});

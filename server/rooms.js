@@ -7,6 +7,27 @@ var config = require("./config.js");
 var ids = require("./ids.js");
 var Room = require("./room.js").Room;
 
+// ---- 戰情中心（lobby）公開曝光規則 ----
+// 等待房：建立滿 30 秒才公開曝光（訪客可直接加入，快速私密開局不上板）。
+// 已結束房間：終局後保留 5 分鐘（避免掃到一半棋局從板上消失）。
+var LOBBY_WAIT_VISIBILITY_MS = 30000;
+var LOBBY_ENDED_RETENTION_MS = 5 * 60 * 1000;
+
+// 純函式：Room 或 RoomDoc（兩者皆有 status/createdAt/updatedAt 欄位）現在能否上板。
+// playing 一律可列；waiting 等 30 秒；finished 自終局（updatedAt）起算保留 5 分鐘。
+function isLobbyListable(roomOrDoc, nowMs) {
+  if (!roomOrDoc) return false;
+  var now = typeof nowMs === "number" ? nowMs : Date.now();
+  var status = roomOrDoc.status;
+  if (status === "playing") return true;
+  if (status === "waiting") {
+    return now - (roomOrDoc.createdAt || 0) >= LOBBY_WAIT_VISIBILITY_MS;
+  }
+  if (status !== "finished") return false;
+  var endedAt = roomOrDoc.finishedAt || roomOrDoc.updatedAt || 0;
+  return now - endedAt < LOBBY_ENDED_RETENTION_MS;
+}
+
 class RoomManager {
   // transport: { send(socketId, payload), close(socketId, code, reason) }
   constructor(store, transport) {
@@ -115,6 +136,8 @@ class RoomManager {
     }
     return {
       roomId: room.roomId,
+      status: room.status,
+      createdAt: room.createdAt,
       players: [playerAt(blackSeat), playerAt(whiteSeat)],
       blackCount: blackCount,
       whiteCount: whiteCount,
@@ -137,6 +160,8 @@ class RoomManager {
     }
     return {
       roomId: doc.roomId,
+      status: doc.status,
+      createdAt: doc.createdAt || 0,
       players: [playerAt(blackSeat), playerAt(whiteSeat)],
       blackCount: blackCount,
       whiteCount: whiteCount,
@@ -146,22 +171,26 @@ class RoomManager {
     };
   }
 
-  // 只列 playing 且兩座都有人；快取房 + store listActive 合併去重，updatedAt 新→舊
+  // 戰情中心名單（公開曝光規則見 isLobbyListable）：
+  //   playing 且坐滿 → 一律列出；waiting 滿 30 秒 → 列出；finished 5 分鐘內 → 列出。
+  // 快取房 + store listActive 合併去重，updatedAt 新→舊。
   async listGames(limit) {
     limit = limit || Protocol.LOBBY_HTTP_LIMIT;
+    var nowMs = Date.now();
     var summaries = new Map();
     var self = this;
     this.cache.forEach(function (room) {
-      if (room.status === "playing" && room.seats[0] && room.seats[1]) {
-        summaries.set(room.roomId, self.gameSummaryFromRoom(room));
-      }
+      if (room.status === "playing" && !(room.seats[0] && room.seats[1])) return; // 沒坐滿不上板
+      if (!isLobbyListable(room, nowMs)) return;
+      summaries.set(room.roomId, self.gameSummaryFromRoom(room));
     });
     try {
       var docs = await this.store.listActive(limit);
       docs.forEach(function (doc) {
-        if (!summaries.has(doc.roomId) && doc.seats[0] && doc.seats[1]) {
-          summaries.set(doc.roomId, self.gameSummaryFromDoc(doc));
-        }
+        if (summaries.has(doc.roomId)) return;
+        if (doc.status === "playing" && !(doc.seats && doc.seats[0] && doc.seats[1])) return;
+        if (!isLobbyListable(doc, nowMs)) return;
+        summaries.set(doc.roomId, self.gameSummaryFromDoc(doc));
       });
     } catch (e) { /* store 失敗時僅回快取 */ }
     var list = Array.from(summaries.values());
@@ -201,4 +230,4 @@ class RoomManager {
   }
 }
 
-module.exports = { RoomManager: RoomManager };
+module.exports = { RoomManager: RoomManager, isLobbyListable: isLobbyListable, LOBBY_WAIT_VISIBILITY_MS: LOBBY_WAIT_VISIBILITY_MS, LOBBY_ENDED_RETENTION_MS: LOBBY_ENDED_RETENTION_MS };

@@ -228,6 +228,56 @@ test("整合：HTTP /api/games 只列滿座進行中對局；/r/:roomId 回 SPA"
   assert.ok(html.indexOf("app.js") >= 0, "回 SPA shell");
 });
 
+test("整合：/api/games 戰情中心曝光規則 — status 欄位、等待房 30 秒曝光、終局保留", async (t) => {
+  var built = await startServer();
+  t.after(function () { built.closeAll ? built.closeAll() : built.server.close(); });
+
+  var room = await createRoom(built, "阿黑", "standard");
+  var ws0 = await openWs(built.wsUrl);
+  var ws1 = await openWs(built.wsUrl);
+  var ws2 = await openWs(built.wsUrl); // 戰情中心訂閱者
+  t.after(function () { ws0.ws.close(); ws1.ws.close(); ws2.ws.close(); });
+
+  // 剛建立的 waiting 房：不列（快取房規則由 isLobbyListable 把關）
+  var res0 = await fetch(built.base + "/api/games");
+  assert.equal((await res0.json()).games.find(g => g.roomId === room.roomId), undefined, "waiting 30 秒內不列");
+
+  ws0.send({ t: "join", roomId: room.roomId, playerToken: room.playerToken, name: "阿黑" });
+  await ws0.wait("joined");
+  ws1.send({ t: "join", roomId: room.roomId, name: "阿白" });
+  await ws1.wait("joined");
+
+  // 滿座 playing：列出且帶 status
+  var res1 = await fetch(built.base + "/api/games");
+  var playing = (await res1.json()).games.find(g => g.roomId === room.roomId);
+  assert.ok(playing, "滿座 playing 應列出");
+  assert.equal(playing.status, "playing");
+
+  // WS lobby 推播同樣帶 status 欄位
+  ws2.send({ t: "subscribeLobby" });
+  var lobbyMsg = await ws2.wait("lobby", null, 1500);
+  var pushed = lobbyMsg.games.find(g => g.roomId === room.roomId);
+  assert.ok(pushed, "訂閱者應收到 lobby 推播");
+  assert.equal(pushed.status, "playing");
+
+  // 等待房滿 30 秒後應公開曝光（把 createdAt 往回撥 31 秒，不必等真實 30 秒）
+  var room2 = await createRoom(built, "等三十秒", "standard");
+  var r2 = built.manager.cache.get(room2.roomId);
+  r2.createdAt = Date.now() - 31000;
+  var res2 = await fetch(built.base + "/api/games");
+  var listed2 = (await res2.json()).games.find(g => g.roomId === room2.roomId);
+  assert.ok(listed2, "等待房滿 30 秒應公開曝光");
+  assert.equal(listed2.status, "waiting");
+
+  // 認輸終局 → finished 保留期內列出
+  ws0.send({ t: "resign" });
+  await ws1.wait("gameOver", null, 2000);
+  var res3 = await fetch(built.base + "/api/games");
+  var finishedRow = (await res3.json()).games.find(g => g.roomId === room.roomId);
+  assert.ok(finishedRow, "終局應在保留期內列出");
+  assert.equal(finishedRow.status, "finished");
+});
+
 test("整合：未知房型 / 錯誤訊息 → error 碼", async (t) => {
   var built = await startServer();
   t.after(function () { built.closeAll ? built.closeAll() : built.server.close(); });

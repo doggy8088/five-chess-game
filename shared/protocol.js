@@ -46,14 +46,19 @@ function () {
   P.CLIENT_TYPES = [
     "subscribeLobby", "join", "action", "chat", "canned",
     "drawOffer", "drawResponse", "abortRequest", "abortResponse",
-    "resign", "rematch", "rematchResponse"
+    "resign", "rematch", "rematchResponse", "announcementAck"
   ];
 
   // ---- 欄位上限（guards 用）----
   P.LIMITS = {
     roomId: 24, playerToken: 64, joinName: 24, chatRaw: 500,
-    chatText: 120, cannedId: 32, chatHistory: 50
+    chatText: 120, cannedId: 32, chatHistory: 50,
+    announcementAck: 64
   };
+
+  // ---- 全站公告（後台發佈，全體廣播）----
+  // 下行訊息（server → client）：{ t: "announcement", id, text, at }
+  // 上行回條（client → server）：{ t: "announcementAck", id }，id 為公告 uuid。
 
   // ---- 快速訊息白名單（含 Emoji 與嗆聲垃圾話，id 同時是 client/server 白名單）----
   P.CANNED_MESSAGES = {

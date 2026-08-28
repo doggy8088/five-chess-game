@@ -37,7 +37,7 @@ test("store：listActive 只列 playing，依 updatedAt 新→舊", async () => 
   assert.equal(docs[1].roomId, r1.roomId);
 });
 
-test("manager：listGames 只列 playing 且滿座的局、只含公開欄位", async () => {
+test("manager：listGames 公開曝光規則（playing 坐滿必列、waiting 30 秒內不列、finished 保留期內列出）", async () => {
   var store = new storeMod.InMemoryStore();
   var transport = new FakeTransport();
   var manager = new RoomManager(store, { send: transport.send.bind(transport), close: transport.close.bind(transport) });
@@ -55,14 +55,27 @@ test("manager：listGames 只列 playing 且滿座的局、只含公開欄位", 
   finished.resign("s0", 0);
 
   var games = await manager.listGames(20);
-  assert.equal(games.length, 1);
-  assert.equal(games[0].roomId, full.roomId);
-  assert.equal(games[0].players.length, 2);
-  assert.ok(games[0].players[0].name);
-  assert.equal(games[0].players[0].color, "black");
-  assert.equal(games[0].players[1].color, "white");
-  assert.equal(typeof games[0].blackCount, "number");
-  assert.equal(typeof games[0].turnNumber, "number");
+  var fullRow = games.find(g => g.roomId === full.roomId);
+  var finishedRow = games.find(g => g.roomId === finished.roomId);
+
+  assert.ok(fullRow, "滿座 playing 應列出");
+  assert.equal(fullRow.status, "playing");
+  assert.equal(fullRow.players.length, 2);
+  assert.ok(fullRow.players[0].name);
+  assert.equal(fullRow.players[0].color, "black");
+  assert.equal(fullRow.players[1].color, "white");
+  assert.equal(typeof fullRow.blackCount, "number");
+  assert.equal(typeof fullRow.turnNumber, "number");
+
+  assert.equal(games.find(g => g.roomId === waiting.roomId), undefined, "剛建立的 waiting 不列（30 秒內）");
+
+  assert.ok(finishedRow, "終局保留期內應列出");
+  assert.equal(finishedRow.status, "finished");
+
+  // 終局超過 5 分鐘（LOBBY_ENDED_RETENTION_MS）後不再曝光
+  finished.updatedAt = Date.now() - 5 * 60 * 1000 - 1;
+  var games2 = await manager.listGames(20);
+  assert.equal(games2.find(g => g.roomId === finished.roomId), undefined, "終局逾 5 分鐘不列");
 });
 
 test("manager：並發載入合併成同一個 Room（不會分岔）", async () => {
