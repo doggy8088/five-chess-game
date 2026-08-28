@@ -1075,6 +1075,19 @@
   // 對外開放入口首頁顯示／收起（online/ui.js 的「回主畫面」用）
   window.GomokuEntry = { show: showEntry, hide: hideEntry };
 
+  // 遊戲中回主畫面：曾由「開始遊戲」push 過 /game 就走 history.back()（畫面交給 popstate 對齊）；
+  // 直接載入 /game（背後沒有本站歷史可退）則就地改回 / 並切換畫面
+  function exitGameToHome() {
+      var st = null;
+      try { st = history.state; } catch (e) { st = null; }
+      if (st && st.gomokuScreen === "game") {
+        history.back();
+        return;
+        }
+      try { history.replaceState(null, "", "/"); } catch (e) { /* 靜態託管等環境不支援時忽略 */ }
+      showEntry();
+       }
+
   function initEntryScreen() {
       var el = entryEl();
       if (!el) return;
@@ -1085,18 +1098,27 @@
         hideEntry();
         return;
         }
-      if (document.body) document.body.classList.add("entry-open");
+      if (path === "/game") {
+        // /game 深連結／重新整理：直接進入本地遊戲畫面（URL 已正確，開頁不 pushState）。
+        // 不 early-return：遊戲中的「主畫面」等按鈕仍需接線。
+        hideEntry();
+        }
+      else if (document.body) document.body.classList.add("entry-open");
       var btn = document.getElementById("btn-entry-local");
-      if (btn) btn.addEventListener("click", function () { hideEntry(); });
+      if (btn) btn.addEventListener("click", function () {
+        // 讓瀏覽器上一頁能回入口首頁（畫面切換統一交給 popstate 對齊）
+        try { history.pushState({ gomokuScreen: "game" }, "", "/game"); } catch (e) { /* 靜態託管等環境不支援時忽略 */ }
+        hideEntry();
+        });
       var homeBtn = document.getElementById("btn-game-home");
       if (homeBtn) homeBtn.addEventListener("click", function () {
         // 還沒落子：沒有任何進度，直接回主畫面不必確認
-        if (game.moves.length === 0) { showEntry(); return; }
+        if (game.moves.length === 0) { exitGameToHome(); return; }
         var confirmApi = window.GomokuConfirm;
         if (confirmApi && typeof confirmApi.open === "function") {
-          confirmApi.open("回遊戲主畫面", "確定要離開目前的對局嗎？遊戲進度會保留，回到主畫面後可再點「開始遊戲」續玩。", "離開遊戲", function () { showEntry(); }, "繼續下棋");
+          confirmApi.open("回遊戲主畫面", "確定要離開目前的對局嗎？遊戲進度會保留，回到主畫面後可再點「開始遊戲」續玩。", "離開遊戲", function () { exitGameToHome(); }, "繼續下棋");
         } else {
-          showEntry();
+          exitGameToHome();
         }
         });
        }

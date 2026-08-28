@@ -293,7 +293,10 @@
     }
   }
 
-  // 瀏覬器上一頁／下一頁：URL 已由瀏覽器改好，這裡只把畫面對齊 URL（不得再 push/replace）
+  // 瀏覬器上一頁／下一頁：URL 已由瀏覽器改好，這裡只把畫面對齊 URL（不得再 push/replace）。
+  // 對齊矩陣：/r/:roomId → 房間深連結；/online → 線上大廳；/game → 本地遊戲畫面
+  // （app.js「開始遊戲」push 過 /game，返回／前進都要能對齊）；其餘（/）→ 入口首頁
+  // （本地遊戲畫面藏在入口 overlay 底下，顯示入口即完成對齊）。
   function onPopState() {
     var roomId = parseRoomFromPath();
     if (roomId) {
@@ -303,6 +306,14 @@
     if (location.pathname === "/online") {
       if (session) teardownRoom(); // 從對局退回大廳：先結束房間連線
       showScreen("home");
+      return;
+    }
+    if (location.pathname === "/game") {
+      // 返回／前進到本地遊戲畫面：先收掉線上殘留，再亮出遊戲畫面（收起入口 overlay）
+      if (session) teardownRoom(); // 從線上房間／大廳切過來：先結束房間連線
+      hideOnlineLayer();
+      document.title = originalTitle;
+      if (window.GomokuEntry && window.GomokuEntry.hide) window.GomokuEntry.hide();
       return;
     }
     pushedOnline = false; // 對應的 /online push 已被「上一頁」消費

@@ -1,6 +1,6 @@
 "use strict";
 /* WS 入口 + HTTP API：靜態檔、/api/healthz、/api/health、/api/games、POST /api/rooms、
-   /r/:roomId 與 /online SPA 路由、/admin 後台殼、後台管理 API（登入/公告/指標/IP 監控封鎖）、
+   /r/:roomId、/online 與 /game SPA 路由、/admin 後台殼、後台管理 API（登入/公告/指標/IP 監控封鎖）、
    /ws upgrade（含 IP 封鎖拒絕與既有連線踢除）、30s 心跳、大廳訂閱推播。
    後台相關環境變數：
    - GOOGLE_CLIENT_ID：OAuth client id（/api/admin/config 公開；登入驗證 audience 必填）。
@@ -313,6 +313,11 @@ function createServer(opts) {
 
   // /online → 線上對戰大廳 SPA shell（client 從路由解析畫面；深連結／重新整理可用）
   app.get("/online", function (req, res) {
+    res.type("html").set("Cache-Control", "no-cache").send(getIndexHtml());
+  });
+
+  // /game → 本地遊戲 SPA shell（client 從路由解析畫面；深連結／重新整理可用）
+  app.get("/game", function (req, res) {
     res.type("html").set("Cache-Control", "no-cache").send(getIndexHtml());
   });
 
