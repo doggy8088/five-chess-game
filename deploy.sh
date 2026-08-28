@@ -6,6 +6,17 @@ PROJECT_ID="${PROJECT_ID:-vertex-ai-sprint}"
 REGION="${REGION:-asia-east1}"
 SERVICE="${SERVICE:-gomoku}"
 
+# 管理後台（/admin）所需環境變數，從本機環境帶入（留空則用安全預設）
+GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
+ADMIN_EMAILS="${ADMIN_EMAILS:-doggy.huang@gmail.com}"
+ADMIN_SESSION_SECRET="${ADMIN_SESSION_SECRET:-}"
+
+if [ -z "$GOOGLE_CLIENT_ID" ] || [ -z "$ADMIN_SESSION_SECRET" ]; then
+  echo "==> ⚠️  警告：管理後台環境變數未設定齊全"
+  [ -z "$GOOGLE_CLIENT_ID" ] && echo "    GOOGLE_CLIENT_ID 留空 → 後台 Google 登入需設定，未設將無法登入 /admin"
+  [ -z "$ADMIN_SESSION_SECRET" ] && echo "    ADMIN_SESSION_SECRET 留空 → SESSION_SECRET 留空則重啟後 session 失效（全員被登出）"
+fi
+
 echo "==> 專案：$PROJECT_ID · 區域：$REGION · 服務：$SERVICE"
 
 gcloud config set project "$PROJECT_ID" 2>/dev/null
@@ -25,7 +36,7 @@ gcloud run deploy "$SERVICE" \
   --memory 512Mi \
   --cpu 1 \
   --allow-unauthenticated \
-  --set-env-vars "FIRESTORE_ENABLED=1,FIRESTORE_COLLECTION=rooms,NODE_ENV=production"
+  --set-env-vars "FIRESTORE_ENABLED=1,FIRESTORE_COLLECTION=rooms,NODE_ENV=production,GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},ADMIN_EMAILS=${ADMIN_EMAILS},ADMIN_SESSION_SECRET=${ADMIN_SESSION_SECRET}"
 
 echo "==> 設定 Firestore TTL（finished 房 24h / 未結束房 7 天，自動刪除過期房間文件）"
 echo "    （首次部署請確認 rooms collection 已有 expireAt 欄位文件後再執行）"

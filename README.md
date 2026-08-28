@@ -13,6 +13,7 @@
 
 - [遊戲簡介](#遊戲簡介)
 - [線上對戰](#線上對戰)
+- [管理後台](#管理後台)
 - [使用說明](#使用說明)
 - [遊戲規則](#遊戲規則)
 - [各模式規則對照](#各模式規則對照)
@@ -35,10 +36,41 @@
 | **協商功能** | 和棋、提前結束（不計勝負）、認輸、再來一局（重洗、換先手），皆需雙方同意。 |
 | **聊天室** | 雙分頁抽屜（聊天室＋人員名單）、12 句快速訊息、未讀徽章、限速防灌水、觀眾可聊天。 |
 | **戰情中心** | 首頁即時戰況：進行戰局、在線棋手、觀戰人數，一鍵進入觀戰（WS 推播＋HTTP 輪詢兜底）；「只看交戰中」開關、膠著／激戰標籤；等待房滿 30 秒才公開曝光、終局保留 5 分鐘。 |
-| **全站公告** | 後台發佈 `{t:"announcement", id, text, at}` 全體廣播，前台強制閱讀、按「我知道了」回傳 `{t:"announcementAck", id}` 已讀回條（localStorage 記住最近 50 筆）。 |
+| **全站公告** | 後台（`/admin`）發佈 `{t:"announcement", id, text, at}` 全體廣播，前台強制閱讀、按「我知道了」回傳 `{t:"announcementAck", id}` 已讀回條（localStorage 記住最近 50 筆，後台可查各則已讀追蹤）。 |
 | **規則集選擇** | 建立房間時選擇「自由／標準／連珠」，對局全程依該規則集裁決。 |
 
 > 純靜態部署（如 GitHub Pages）會自動探測不到對戰伺服器，此時線上功能整體隱藏、單機玩法不受影響。
+
+---
+
+## 管理後台
+
+網站內建管理後台（admin console），入口為 `<正式機>/admin`，以 **Google 登入**驗證，僅 `ADMIN_EMAILS` allowlist 內的帳號可進入。
+
+### 功能
+
+- **即時指標卡**：進行戰局、在線棋手、觀戰人數、連線數等即時戰況總覽（`/api/admin/metrics/live`）。
+- **全站公告已讀追蹤**：發佈全站公告（前台強制閱讀＋已讀回條）、查詢每則公告的已讀名單與已讀率。
+- **負載圖表**：以 Chart.js 繪製每分鐘／每小時／每日三種粒度的負載曲線（HTTP 請求、WS 訊息、連線事件）。
+- **IP 監控與封鎖踢線**：依 IP 統計流量、異常告警歷史、封鎖名單（限時 5m～7d 或永久）；被封鎖的 IP 連線即被踢線（`/admin`、健康檢查端點不受限）。
+
+### 所需環境變數
+
+| 變數 | 說明 | 預設 |
+|------|------|------|
+| `GOOGLE_CLIENT_ID` | Google OAuth client id（登入 ID token 的 audience，經 `/api/admin/config` 公開給登入頁） | 無（**必填**，未設無法登入後台） |
+| `ADMIN_EMAILS` | 管理員 email allowlist（逗號分隔） | `doggy.huang@gmail.com` |
+| `ADMIN_SESSION_SECRET` | 後台 session cookie 的 HMAC 簽章金鑰 | 未設時每次重啟隨機產生（**重啟即全員登出**，正式機建議設固定值） |
+| `IP_ALERT_HTTP_PER_MIN` | 單一 IP 每分鐘 HTTP 請求告警閥值 | `120` |
+| `IP_ALERT_WS_PER_MIN` | 單一 IP 每分鐘 WS 訊息告警閥值 | `600` |
+| `IP_ALERT_CONN_PER_MIN` | 單一 IP 每分鐘連線事件告警閥值 | `10` |
+| `IP_ALERT_HTTP_PER_HOUR` | 單一 IP 每小時 HTTP 請求告警閥值 | `2000` |
+
+### 部署注意
+
+- **Google OAuth 設定**：`GOOGLE_CLIENT_ID` 對應的 OAuth client，其 **Authorized JavaScript origins 必須包含正式機網域**（如 `https://gomoku.game.miniasp.com` 與 Cloud Run 網址），否則 Google 登入按鈕無法啟動。
+- `ADMIN_SESSION_SECRET` 建議在部署環境設定固定亂數字串，避免每次部署重啟後管理員全員被登出。
+- `deploy.sh` 會從本機環境帶入 `GOOGLE_CLIENT_ID`、`ADMIN_EMAILS`、`ADMIN_SESSION_SECRET`（未設時有安全預設，見上方表格），不會把任何金鑰寫進檔案。
 
 ---
 
@@ -238,11 +270,11 @@ gcloud run deploy gomoku \
   --min-instances 0 --max-instances 1 \  # 單實例讓記憶體 lobby 名單一致
   --memory 512Mi \
   --allow-unauthenticated \
-  --set-env-vars "FIRESTORE_ENABLED=1,FIRESTORE_COLLECTION=rooms"
+  --set-env-vars "FIRESTORE_ENABLED=1,FIRESTORE_COLLECTION=rooms,NODE_ENV=production"
 ```
 
 - **持久化**：正式環境用 Firestore（`rooms/{roomId}` 一房一文件），重啟後房間可重建；`expireAt` 欄位搭配 collection TTL policy 自動清理（finished 房 24 小時、未結束房 7 天）。`FIRESTORE_ENABLED=0` 切回 InMemoryStore。
-- **環境變數**：`PORT`（Cloud Run 自帶）、`TURN_MS`（回合鐘，預設 60000）、`GRACE_MS`（斷線寬限，預設 90000）、`APP_VERSION`。
+- **環境變數**：`PORT`（Cloud Run 自帶）、`TURN_MS`（回合鐘，預設 60000）、`GRACE_MS`（斷線寬限，預設 90000）、`APP_VERSION`；管理後台另需 `GOOGLE_CLIENT_ID`、`ADMIN_EMAILS`、`ADMIN_SESSION_SECRET`（詳見[管理後台](#管理後台)）。
 - **健康檢查**：`/api/healthz` 回 `ok`；`/api/health` 回 `{ok, version}`。
 
 ---

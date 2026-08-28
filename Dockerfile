@@ -9,6 +9,7 @@ RUN npm install --omit=dev && npm cache clean --force
 
 # 複製應用程式
 COPY index.html app.js game.js styles.css robots.txt favicon.ico CNAME* ./
+COPY admin.html admin.js admin.css ./
 COPY shared ./shared
 COPY online ./online
 COPY server ./server

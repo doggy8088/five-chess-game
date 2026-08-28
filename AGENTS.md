@@ -11,9 +11,18 @@
 ## 正式環境網址
 
 - **Cloud Run（線上對戰主站）**：https://gomoku-wpnna43hmq-de.a.run.app （專案 `vertex-ai-sprint` · 區域 `asia-east1` · 服務 `gomoku`）
+- **管理後台**：`<正式機>/admin`（如 https://gomoku-wpnna43hmq-de.a.run.app/admin ，Google 登入，僅 `ADMIN_EMAILS` allowlist 可進入）
 - **GitHub Pages（單機版靜態站）**：https://five-chess-game.gh.miniasp.com （CNAME 見 `CNAME`）
 - 健康檢查：`GET /api/health`（回傳版號，部署後可用來確認新版已生效）。
 - `bash deploy.sh` 部署完成後會在終端機顯示正式機網址與驗證指令。
+
+### 管理後台備忘
+
+- **相關環境變數**：`GOOGLE_CLIENT_ID`（Google OAuth client id，登入必填）、`ADMIN_EMAILS`（管理員 allowlist，逗號分隔，預設 `doggy.huang@gmail.com`）、`ADMIN_SESSION_SECRET`（session HMAC 金鑰；留空則重啟後 session 失效、全員登出）、`IP_ALERT_*`（IP 異常告警閥值，見 `server/ip-monitor.js`）。
+- **健康驗證**：`curl <正式機>/api/health`。
+- **後台快速驗證**（部署後）：
+  - `curl -s <url>/admin -o /dev/null -w '%{http_code}'` → 預期 `200`（admin.html 殼正常載入）。
+  - `curl -s <url>/api/admin/session` → 預期 `{"authenticated":false,...}`（未登入狀態正常）。
 
 ## 版號規則（每次更版必做）
 
