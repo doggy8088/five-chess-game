@@ -147,6 +147,7 @@
 </button>
 
 <div id="local-game-hud">
+  <button class="btn board-view-btn" id="btn-board-view-local" type="button" aria-label="切換棋盤視角" title="切換棋盤視角"><span class="board-view-icon" aria-hidden="true">🧭</span><span class="board-view-label">切換棋盤視角</span></button>
   <button class="btn board-lock-btn" id="btn-board-lock-local" type="button" aria-pressed="false"><span class="board-lock-icon" aria-hidden="true">🔓</span><span class="board-lock-label">鎖定棋盤視角</span></button>
   <button class="btn menu-btn" id="btn-game-menu" type="button" aria-label="遊戲選單">⋯</button>
 </div>
@@ -205,7 +206,7 @@
     </div>
     <footer class="entry-footer">
       <p class="entry-copyright">Copyright © 2026 <a href="https://www.facebook.com/will.fans/" target="_blank" rel="noopener noreferrer" aria-label="Will 保哥的 Facebook 粉絲專頁">Will 保哥</a></p>
-      <p class="entry-version">v0.3.5</p>
+      <p class="entry-version">v0.3.6</p>
     </footer>
   </div>
 </section>
@@ -247,7 +248,7 @@
       </div>
       <footer class="online-footer">
         <p class="entry-copyright">Copyright © 2026 <a href="https://www.facebook.com/will.fans/" target="_blank" rel="noopener noreferrer" aria-label="Will 保哥的 Facebook 粉絲專頁">Will 保哥</a></p>
-        <p class="entry-version" id="online-version">v0.3.5</p>
+        <p class="entry-version" id="online-version">v0.3.6</p>
       </footer>
     </div>
   </section>
@@ -310,6 +311,7 @@
 <!-- 對局中的線上元件 -->
 <span id="opponent-status" class="opponent-status hidden">對手已斷線</span>
 <div id="online-hud" class="hidden">
+  <button class="btn board-view-btn" id="btn-board-view-online" type="button" aria-label="切換棋盤視角" title="切換棋盤視角"><span class="board-view-icon" aria-hidden="true">🧭</span><span class="board-view-label">切換棋盤視角</span></button>
   <button class="btn board-lock-btn" id="btn-board-lock-online" type="button" aria-pressed="false"><span class="board-lock-icon" aria-hidden="true">🔓</span><span class="board-lock-label">鎖定棋盤視角</span></button>
   <button class="btn chat-btn" id="btn-chat" type="button" aria-label="開啟聊天室">💬<span id="chat-badge" class="badge hidden">0</span></button>
   <button class="btn menu-btn" id="btn-online-menu" type="button" aria-label="線上對戰選單">⋯</button>

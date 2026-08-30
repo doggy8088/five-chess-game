@@ -11,6 +11,13 @@
      var SIZE = 15;
      var ZOOM_MIN = 30, ZOOM_MAX = 130, DEFAULT_ZOOM = 100;
      var SETTINGS_KEY = "gomoku-settings-v1";
+     var BOARD_VIEW_PRESETS = [
+       { name: "右前方", theta: 0.6, phi: 0.92 },
+       { name: "左前方", theta: -0.6, phi: 0.92 },
+       { name: "左後方", theta: -2.54, phi: 0.92 },
+       { name: "右後方", theta: 2.54, phi: 0.92 },
+       { name: "俯視", theta: 0.6, phi: 0.32 }
+     ];
 
   function normalizeDifficulty(value) {
       return value === "easy" || value === "medium" || value === "hard" ? value : "hard";
@@ -27,6 +34,20 @@
       return value === "white" ? "white" : "black";
        }
 
+  function normalizeBoardView(value) {
+      var hasTheta = value && value.theta != null && isFinite(Number(value.theta));
+      var hasPhi = value && value.phi != null && isFinite(Number(value.phi));
+      return {
+        theta: hasTheta ? Number(value.theta) : BOARD_VIEW_PRESETS[0].theta,
+        phi: hasPhi ? Math.max(0.32, Math.min(1.35, Number(value.phi))) : BOARD_VIEW_PRESETS[0].phi
+      };
+       }
+
+  function normalizeBoardViewPreset(value) {
+      var index = Number(value);
+      return Number.isInteger(index) && index >= 0 && index < BOARD_VIEW_PRESETS.length ? index : 0;
+       }
+
   function loadSettings() {
       try {
         var raw = localStorage.getItem(SETTINGS_KEY);
@@ -36,11 +57,20 @@
             difficulty: normalizeDifficulty(saved.difficulty),
             zoom: normalizeZoom(saved.zoom),
             playerSide: normalizePlayerSide(saved.playerSide),
-            boardViewLocked: saved.boardViewLocked === true
+            boardViewLocked: saved.boardViewLocked === true,
+            boardView: normalizeBoardView(saved.boardView),
+            boardViewPreset: normalizeBoardViewPreset(saved.boardViewPreset)
           };
         }
       } catch (e) { /* 忽略損壞或不可用的設定 */ }
-      return { difficulty: "hard", zoom: DEFAULT_ZOOM, playerSide: "black", boardViewLocked: false };
+      return {
+        difficulty: "hard",
+        zoom: DEFAULT_ZOOM,
+        playerSide: "black",
+        boardViewLocked: false,
+        boardView: normalizeBoardView(null),
+        boardViewPreset: 0
+      };
        }
 
   var savedSettings = loadSettings();
@@ -48,6 +78,8 @@
     var currentZoom = savedSettings.zoom;
     var playerSide = savedSettings.playerSide;   // black | white
     var boardViewLocked = savedSettings.boardViewLocked;
+    var boardView = savedSettings.boardView;
+    var boardViewPreset = savedSettings.boardViewPreset;
     var vsAI = true;
     var aiPlayer = vsAI ? (playerSide === "white" ? G.BLACK : G.WHITE) : null;
     var game = G.createGame({ size: SIZE, vsAI: vsAI, aiPlayer: aiPlayer, difficulty: difficulty });
@@ -72,6 +104,7 @@
      zoomRange: $("zoom-range"), zoomValue: $("zoom-value"),
      overlayNew: $("ov-new"), overlayShare: $("ov-share"), overlayDownload: $("ov-download"), modeLabel: $("mode-label"),
      dock: $("dock"), dockClose: $("dock-close"), dockOpen: $("dock-open"),
+     boardViewLocal: $("btn-board-view-local"), boardViewOnline: $("btn-board-view-online"),
      boardLockLocal: $("btn-board-lock-local"), boardLockOnline: $("btn-board-lock-online"),
      gameMenu: $("local-game-menu"), gameMenuOpen: $("btn-game-menu"),
      gameMenuHome: $("menu-game-home"), gameMenuClose: $("menu-game-close")
@@ -83,7 +116,9 @@
           difficulty: difficulty,
           zoom: currentZoom,
           playerSide: playerSide,
-          boardViewLocked: boardViewLocked
+          boardViewLocked: boardViewLocked,
+          boardView: boardView,
+          boardViewPreset: boardViewPreset
         }));
       } catch (e) { /* 忽略不可用的儲存空間 */ }
        }
@@ -205,7 +240,7 @@
 
         // 攝影機 orbit
       var orbit = { radius: 15, theta: 0.6, phi: 0.92, last: { x: 0, y: 0 } };
-      var reportedZoom = DEFAULT_ZOOM, onZoomCb = null;
+      var reportedZoom = DEFAULT_ZOOM, onZoomCb = null, onViewChangeCb = null;
       function applyCam() {
         orbit.radius = Math.max(8, Math.min(60, orbit.radius));
         var sp = Math.sin(orbit.phi), cp = Math.cos(orbit.phi);
@@ -219,6 +254,14 @@
         var zoom = normalizeZoom(percent);
         reportedZoom = zoom;
         orbit.radius = 15 * DEFAULT_ZOOM / zoom;
+         }
+      function setView(nextView) {
+        var normalized = normalizeBoardView(nextView);
+        orbit.theta = normalized.theta;
+        orbit.phi = normalized.phi;
+         }
+      function reportViewChange() {
+        if (onViewChangeCb) onViewChangeCb({ theta: orbit.theta, phi: orbit.phi });
          }
 
       var blackMat = new THREE.MeshStandardMaterial({ color: 0x1b1d24, roughness: 0.3, metalness: 0.25 });
@@ -335,9 +378,15 @@
           var g = gridFromEvent(e);
           if (g && onPickCb) onPickCb(g);
            }
+        else if (dragging && moved && !boardViewLocked) reportViewChange();
         dragging = false;
          });
-      canvas.addEventListener("pointerleave", function () { hover.visible = false; if (onHoverCb) onHoverCb(null); });
+      canvas.addEventListener("pointerleave", function () {
+        if (dragging && moved && !boardViewLocked) reportViewChange();
+        dragging = false;
+        hover.visible = false;
+        if (onHoverCb) onHoverCb(null);
+      });
       canvas.addEventListener("wheel", function (e) {
         e.preventDefault();
         if (boardViewLocked) return;
@@ -384,6 +433,8 @@
         hideMoveNumbers: function () { labels.visible = false; },
         setZoom: setZoom,
         onZoom: function (cb) { onZoomCb = cb; },
+        setView: setView,
+        onViewChange: function (cb) { onViewChangeCb = cb; },
         reset: function () { clearGroup(stones); clearGroup(labels); clearGroup(marks); labels.visible = false; lastMarker.visible = false; animators.length = 0; },
         onPick: function (cb) { onPickCb = cb; },
         onHover: function (cb) { onHoverCb = cb; },
@@ -531,6 +582,8 @@
         showMoveNumbers: function () { st.showNumbers = true; draw(); },
         hideMoveNumbers: function () { st.showNumbers = false; draw(); },
         setZoom: function (percent) { st.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Number(percent) || DEFAULT_ZOOM)); draw(); },
+        setView: function () {},
+        onViewChange: function () {},
         reset: function () { st.stones = {}; st.last = null; st.win = []; st.showNumbers = false; draw(); },
         onPick: function (cb) { onPickCb = cb; },
         onHover: function () { },
@@ -551,8 +604,17 @@
         // 可顯示座標提示；回呼不影響邏輯
       });
       if (view.onZoom) view.onZoom(setZoom);
-      if (!use3D) els.hint.textContent = "已切換 2D 模式（無法載入 3D 引擎）· 點擊棋盤落子";
+      if (view.onViewChange) view.onViewChange(function (nextView) {
+        boardView = normalizeBoardView(nextView);
+        saveSettings();
+      });
+      if (!use3D) {
+        els.hint.textContent = "已切換 2D 模式（無法載入 3D 引擎）· 點擊棋盤落子";
+        if (els.boardViewLocal) els.boardViewLocal.classList.add("hidden");
+        if (els.boardViewOnline) els.boardViewOnline.classList.add("hidden");
+      }
       setZoom(currentZoom);
+      view.setView(boardView);
        }
 
   function forbiddenLabel(type) {
@@ -1021,6 +1083,19 @@
       }
     }
 
+  function cycleBoardView() {
+      if (!view || !view._3d) return;
+      boardViewPreset = (boardViewPreset + 1) % BOARD_VIEW_PRESETS.length;
+      boardView = normalizeBoardView(BOARD_VIEW_PRESETS[boardViewPreset]);
+      view.setView(boardView);
+      saveSettings();
+      if (els.toast) {
+        els.toast.textContent = "棋盤視角：" + BOARD_VIEW_PRESETS[boardViewPreset].name;
+        els.toast.classList.add("show");
+        setTimeout(function () { els.toast.classList.remove("show"); }, 1600);
+      }
+    }
+
   function wireUI() {
       document.querySelectorAll(".seg [data-diff]").forEach(function (b) {
         b.addEventListener("click", function () {
@@ -1048,6 +1123,8 @@
        els.overlayDownload.addEventListener("click", downloadResult);
        els.turn.addEventListener("click", reopenOverlay);
        els.zoomRange.addEventListener("input", function () { setZoom(els.zoomRange.value); });
+       if (els.boardViewLocal) els.boardViewLocal.addEventListener("click", cycleBoardView);
+       if (els.boardViewOnline) els.boardViewOnline.addEventListener("click", cycleBoardView);
        if (els.boardLockLocal) els.boardLockLocal.addEventListener("click", toggleBoardViewLock);
        if (els.boardLockOnline) els.boardLockOnline.addEventListener("click", toggleBoardViewLock);
        $("btn-undo").addEventListener("click", function () {

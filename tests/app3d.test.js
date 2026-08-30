@@ -127,6 +127,7 @@ var segBtns = ["easy", "medium", "hard"].map(function (d) {
 let rafCb = null;
 function installDomFor3D() {
   var registry = {};
+  var store = {};
   function byId(id) {
     if (!registry[id]) registry[id] = (id === "gl" || id === "fallback") ? makeCanvas() : makeEl();
     return registry[id];
@@ -144,6 +145,10 @@ function installDomFor3D() {
     createElement() { return makeCanvas(); },
     addEventListener() {}
      };
+  global.localStorage = {
+    getItem: function (key) { return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null; },
+    setItem: function (key, value) { store[key] = String(value); }
+  };
   global.requestAnimationFrame = function (cb) { rafCb = cb; return 1; };
   global.cancelAnimationFrame = function () {};
 }
@@ -220,6 +225,20 @@ test("鎖定棋盤：停用視角縮放但仍可解除鎖定", () => {
   assert.equal(lock.getAttribute("aria-pressed"), "false");
   assert.match(lock.innerHTML, /鎖定棋盤視角/);
   assert.equal(range.disabled, false);
+});
+
+test("切換棋盤視角：循環預設方向並記憶角度", () => {
+  var button = els.getElementById("btn-board-view-local");
+  button.dispatch("click");
+  var settings = JSON.parse(global.localStorage.getItem("gomoku-settings-v1"));
+  assert.equal(settings.boardViewPreset, 1);
+  assert.deepEqual(settings.boardView, { theta: -0.6, phi: 0.92 });
+
+  gl.dispatch("pointerdown", { clientX: 400, clientY: 300, buttons: 1 });
+  gl.dispatch("pointermove", { clientX: 440, clientY: 340, buttons: 1 });
+  gl.dispatch("pointerup", { clientX: 440, clientY: 340, buttons: 0 });
+  settings = JSON.parse(global.localStorage.getItem("gomoku-settings-v1"));
+  assert.notDeepEqual(settings.boardView, { theta: -0.6, phi: 0.92 }, "手動調整後應記憶實際角度");
 });
 
 

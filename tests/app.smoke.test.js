@@ -218,12 +218,14 @@ test("app 設定：記憶最後選擇的難度、縮放比例、執子陣營與�
   range.value = "30";
   range.dispatch("input");
   assert.deepEqual(JSON.parse(global.localStorage.getItem("gomoku-settings-v1")), {
-    difficulty: "easy", zoom: 30, playerSide: "black", boardViewLocked: false
+    difficulty: "easy", zoom: 30, playerSide: "black", boardViewLocked: false,
+    boardView: { theta: 0.6, phi: 0.92 }, boardViewPreset: 0
   });
 
   setSide("white");
   assert.deepEqual(JSON.parse(global.localStorage.getItem("gomoku-settings-v1")), {
-    difficulty: "easy", zoom: 30, playerSide: "white", boardViewLocked: false
+    difficulty: "easy", zoom: 30, playerSide: "white", boardViewLocked: false,
+    boardView: { theta: 0.6, phi: 0.92 }, boardViewPreset: 0
   });
 
   setSide("black");
