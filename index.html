@@ -146,7 +146,10 @@
   <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
 </button>
 
-<button class="game-home-open" id="btn-game-home" type="button" aria-label="回遊戲主畫面" title="回遊戲主畫面">🏠 主畫面</button>
+<div id="local-game-hud">
+  <button class="btn board-lock-btn" id="btn-board-lock-local" type="button" aria-pressed="false">🔓 鎖定</button>
+  <button class="btn menu-btn" id="btn-game-menu" type="button" aria-label="遊戲選單">⋯</button>
+</div>
 
 <div id="hint">點擊棋盤落子 · 捲動縮放 · 拖曳旋轉棋盤 · 可切換難度</div>
 
@@ -202,7 +205,7 @@
     </div>
     <footer class="entry-footer">
       <p class="entry-copyright">Copyright © 2026 <a href="https://www.facebook.com/will.fans/" target="_blank" rel="noopener noreferrer" aria-label="Will 保哥的 Facebook 粉絲專頁">Will 保哥</a></p>
-      <p class="entry-version">v0.3.3</p>
+      <p class="entry-version">v0.3.4</p>
     </footer>
   </div>
 </section>
@@ -244,7 +247,7 @@
       </div>
       <footer class="online-footer">
         <p class="entry-copyright">Copyright © 2026 <a href="https://www.facebook.com/will.fans/" target="_blank" rel="noopener noreferrer" aria-label="Will 保哥的 Facebook 粉絲專頁">Will 保哥</a></p>
-        <p class="entry-version" id="online-version">v0.3.3</p>
+        <p class="entry-version" id="online-version">v0.3.4</p>
       </footer>
     </div>
   </section>
@@ -308,6 +311,7 @@
 <span id="opponent-status" class="opponent-status hidden">對手已斷線</span>
 <div id="online-hud" class="hidden">
   <button class="btn chat-btn" id="btn-chat" type="button" aria-label="開啟聊天室">💬<span id="chat-badge" class="badge hidden">0</span></button>
+  <button class="btn board-lock-btn" id="btn-board-lock-online" type="button" aria-pressed="false">🔓 鎖定</button>
   <button class="btn menu-btn" id="btn-online-menu" type="button" aria-label="線上對戰選單">⋯</button>
 </div>
 
@@ -371,6 +375,19 @@
     </div>
     <div class="overlay-actions">
       <button class="btn" id="menu-close" type="button">關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- 單機遊戲選單 -->
+<div id="local-game-menu" class="hidden" role="dialog" aria-modal="true" aria-label="遊戲選單">
+  <div class="card">
+    <h2>遊戲選單</h2>
+    <div class="menu-list">
+      <button class="btn" id="menu-game-home" type="button">🏠 回主畫面</button>
+    </div>
+    <div class="overlay-actions">
+      <button class="btn" id="menu-game-close" type="button">關閉</button>
     </div>
   </div>
 </div>

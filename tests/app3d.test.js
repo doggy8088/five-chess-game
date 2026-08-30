@@ -202,6 +202,24 @@ test("3D 滾輪縮放：同步百分比、滑桿與無障礙文字", () => {
   range.dispatch("input");
 });
 
+test("鎖定棋盤：停用視角縮放但仍可解除鎖定", () => {
+  var range = els.getElementById("zoom-range");
+  var value = els.getElementById("zoom-value");
+  var lock = els.getElementById("btn-board-lock-local");
+  range.value = "100";
+  range.dispatch("input");
+
+  lock.dispatch("click");
+  assert.equal(lock.getAttribute("aria-pressed"), "true");
+  assert.equal(range.disabled, true);
+  gl.dispatch("wheel", { deltaX: 0, deltaY: -120, preventDefault() {} });
+  assert.equal(value.textContent, "100%", "鎖定後滾輪不得改變棋盤縮放");
+
+  lock.dispatch("click");
+  assert.equal(lock.getAttribute("aria-pressed"), "false");
+  assert.equal(range.disabled, false);
+});
+
 
 // 3D 路徑：拖曳 / 離場 / 縮放 / 難度 / 黑白和 狀態分支
 test("3D 路徑：事件、難度、勝負狀態", async () => {

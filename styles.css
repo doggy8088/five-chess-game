@@ -256,7 +256,7 @@ button.btn.primary{ background:linear-gradient(180deg,var(--accent),#e85f40); bo
   #dock #btn-new, #dock #btn-undo{ flex:1 1 calc(50% - 5px); min-width:0; justify-content:center; }
   #dock #btn-mode{ flex:1 1 100%; justify-content:center; }
   .dock-close{ display:inline-flex; }
-  .dock-open{ right:16px; }
+  .dock-open{ top:64px; right:16px; }
 }
 
 /* =====================================================================
@@ -264,19 +264,15 @@ button.btn.primary{ background:linear-gradient(180deg,var(--accent),#e85f40); bo
  * ===================================================================== */
 .hidden{ display:none !important; }
 
-/* 浮動「回主畫面」按鈕（本地對局中顯示；入口/線上模式隱藏） */
-.game-home-open{
-  position:absolute; z-index:7; top:16px; right:16px;
-  padding:10px 16px; border-radius:999px;
-  background:linear-gradient(135deg, rgba(84,209,255,0.90), rgba(43,150,190,0.90));
-  color:#fff; font-weight:700; font-size:13.5px; letter-spacing:.04em;
-  border:1px solid rgba(255,255,255,0.25); cursor:pointer;
-  box-shadow:0 10px 30px rgba(43,150,190,0.35);
-  transition:transform .15s ease, box-shadow .15s ease;
+/* 本地對局右上角操作：棋盤鎖定在左、選單固定最右 */
+#local-game-hud{ position:fixed; z-index:8; top:16px; right:16px;
+  display:flex; align-items:center; gap:8px; }
+body.entry-open #local-game-hud, body.mode-online #local-game-hud{ display:none; }
+.board-lock-btn{ position:static; padding:8px 14px; border-radius:999px; font-size:13px; }
+.board-lock-btn[aria-pressed="true"]{
+  color:#fff; background:rgba(84,209,255,0.18); border-color:rgba(84,209,255,0.58);
+  box-shadow:0 0 0 1px rgba(84,209,255,0.12);
 }
-.game-home-open:hover{ transform:translateY(-1px); box-shadow:0 14px 34px rgba(43,150,190,0.45); }
-body.entry-open .game-home-open{ display:none; }
-body.mode-online .game-home-open{ display:none; }
 
 /* ---------------- 線上層與畫面 ---------------- */
 #online-layer{ position:fixed; inset:0; z-index:40; overflow:auto;
@@ -529,14 +525,14 @@ body.mode-online #stats .row:nth-child(1), body.mode-online #stats .row:nth-chil
 .people-empty{ font-size:12px; color:var(--ink-dim); text-align:center; padding:10px; }
 
 /* 線上 dialog 與選單（#announcement-dialog 疊在最上層，僅得以「我知道了」關閉） */
-#online-dialog, #online-menu, #announcement-dialog{ position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center;
+#online-dialog, #online-menu, #local-game-menu, #announcement-dialog{ position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center;
   background:rgba(6,9,18,0.6); backdrop-filter:blur(4px); }
 #announcement-dialog{ z-index:90; }
-#online-dialog .card, #online-menu .card, #announcement-dialog .card{
+#online-dialog .card, #online-menu .card, #local-game-menu .card, #announcement-dialog .card{
   width:min(400px, 92vw); padding:26px; border-radius:var(--radius);
   background:rgba(20,26,48,0.98); border:1px solid var(--panel-border); box-shadow:var(--shadow);
   animation:rise .25s ease; }
-#online-dialog h2, #online-menu h2, #announcement-dialog h2{ margin:0 0 10px; font-size:19px; }
+#online-dialog h2, #online-menu h2, #local-game-menu h2, #announcement-dialog h2{ margin:0 0 10px; font-size:19px; }
 #od-sub{ margin:0 0 18px; color:var(--ink-dim); font-size:14px; line-height:1.6; }
 /* 公告內文：保留換行、可換行斷詞 */
 .announcement-text{ margin:0 0 8px; color:var(--ink); font-size:15px; line-height:1.8;

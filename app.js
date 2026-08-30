@@ -35,17 +35,19 @@
           return {
             difficulty: normalizeDifficulty(saved.difficulty),
             zoom: normalizeZoom(saved.zoom),
-            playerSide: normalizePlayerSide(saved.playerSide)
+            playerSide: normalizePlayerSide(saved.playerSide),
+            boardViewLocked: saved.boardViewLocked === true
           };
         }
       } catch (e) { /* 忽略損壞或不可用的設定 */ }
-      return { difficulty: "hard", zoom: DEFAULT_ZOOM, playerSide: "black" };
+      return { difficulty: "hard", zoom: DEFAULT_ZOOM, playerSide: "black", boardViewLocked: false };
        }
 
   var savedSettings = loadSettings();
     var difficulty = savedSettings.difficulty;   // easy | medium | hard
     var currentZoom = savedSettings.zoom;
     var playerSide = savedSettings.playerSide;   // black | white
+    var boardViewLocked = savedSettings.boardViewLocked;
     var vsAI = true;
     var aiPlayer = vsAI ? (playerSide === "white" ? G.BLACK : G.WHITE) : null;
     var game = G.createGame({ size: SIZE, vsAI: vsAI, aiPlayer: aiPlayer, difficulty: difficulty });
@@ -69,12 +71,20 @@
      overlay: $("overlay"), overlayClose: $("ov-close"), ovEmoji: $("ov-emoji"), ovTitle: $("ov-title"), ovSub: $("ov-sub"),
      zoomRange: $("zoom-range"), zoomValue: $("zoom-value"),
      overlayNew: $("ov-new"), overlayShare: $("ov-share"), overlayDownload: $("ov-download"), modeLabel: $("mode-label"),
-     dock: $("dock"), dockClose: $("dock-close"), dockOpen: $("dock-open")
+     dock: $("dock"), dockClose: $("dock-close"), dockOpen: $("dock-open"),
+     boardLockLocal: $("btn-board-lock-local"), boardLockOnline: $("btn-board-lock-online"),
+     gameMenu: $("local-game-menu"), gameMenuOpen: $("btn-game-menu"),
+     gameMenuHome: $("menu-game-home"), gameMenuClose: $("menu-game-close")
      };
 
   function saveSettings() {
       try {
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify({ difficulty: difficulty, zoom: currentZoom, playerSide: playerSide }));
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+          difficulty: difficulty,
+          zoom: currentZoom,
+          playerSide: playerSide,
+          boardViewLocked: boardViewLocked
+        }));
       } catch (e) { /* 忽略不可用的儲存空間 */ }
        }
 
@@ -310,8 +320,10 @@
           var dx = e.clientX - orbit.last.x, dy = e.clientY - orbit.last.y;
           orbit.last = { x: e.clientX, y: e.clientY };
           if (Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY) > 5) moved = true;
-          orbit.theta -= dx * 0.006;
-          orbit.phi = Math.max(0.32, Math.min(1.35, orbit.phi - dy * 0.006));
+          if (!boardViewLocked) {
+            orbit.theta -= dx * 0.006;
+            orbit.phi = Math.max(0.32, Math.min(1.35, orbit.phi - dy * 0.006));
+          }
          } else if (!locked) {
           var g = gridFromEvent(e);
           if (g) { hover.visible = true; hover.position.set(wx(g.x), 0.02, wz(g.y)); if (onHoverCb) onHoverCb(g); }
@@ -328,6 +340,7 @@
       canvas.addEventListener("pointerleave", function () { hover.visible = false; if (onHoverCb) onHoverCb(null); });
       canvas.addEventListener("wheel", function (e) {
         e.preventDefault();
+        if (boardViewLocked) return;
         var minRadius = 15 * DEFAULT_ZOOM / ZOOM_MAX;
         var maxRadius = 15 * DEFAULT_ZOOM / ZOOM_MIN;
         orbit.radius = Math.max(minRadius, Math.min(maxRadius, orbit.radius + e.deltaY * 0.012));
@@ -981,6 +994,29 @@
       // 響應式佈局調整時保留既有收合狀態
     }
 
+  function syncBoardLockButtons() {
+      var buttons = [els.boardLockLocal, els.boardLockOnline];
+      for (var i = 0; i < buttons.length; i++) {
+        if (!buttons[i]) continue;
+        buttons[i].setAttribute("aria-pressed", String(boardViewLocked));
+        buttons[i].textContent = boardViewLocked ? "🔒 已鎖定" : "🔓 鎖定";
+        buttons[i].title = boardViewLocked ? "解除棋盤視角鎖定" : "鎖定棋盤視角";
+        buttons[i].setAttribute("aria-label", buttons[i].title);
+      }
+      els.zoomRange.disabled = boardViewLocked;
+    }
+
+  function toggleBoardViewLock() {
+      boardViewLocked = !boardViewLocked;
+      syncBoardLockButtons();
+      saveSettings();
+      if (els.toast) {
+        els.toast.textContent = boardViewLocked ? "棋盤視角已鎖定" : "棋盤視角已解除鎖定";
+        els.toast.classList.add("show");
+        setTimeout(function () { els.toast.classList.remove("show"); }, 1600);
+      }
+    }
+
   function wireUI() {
       document.querySelectorAll(".seg [data-diff]").forEach(function (b) {
         b.addEventListener("click", function () {
@@ -1008,6 +1044,8 @@
        els.overlayDownload.addEventListener("click", downloadResult);
        els.turn.addEventListener("click", reopenOverlay);
        els.zoomRange.addEventListener("input", function () { setZoom(els.zoomRange.value); });
+       if (els.boardLockLocal) els.boardLockLocal.addEventListener("click", toggleBoardViewLock);
+       if (els.boardLockOnline) els.boardLockOnline.addEventListener("click", toggleBoardViewLock);
        $("btn-undo").addEventListener("click", function () {
         if (undoUsed >= undoLimit()) return;   // 已達本局撤銷上限
         var wasOver = game.isOver();
@@ -1040,6 +1078,7 @@
         els.dock.classList.remove("hidden");
         els.dockOpen.classList.remove("show");
       });
+      syncBoardLockButtons();
        }
 
   function boot() {
@@ -1088,6 +1127,21 @@
       showEntry();
        }
 
+  function closeGameMenu() {
+      if (els.gameMenu) els.gameMenu.classList.add("hidden");
+    }
+
+  function requestExitGameToHome() {
+      closeGameMenu();
+      if (game.moves.length === 0) { exitGameToHome(); return; }
+      var confirmApi = window.GomokuConfirm;
+      if (confirmApi && typeof confirmApi.open === "function") {
+        confirmApi.open("回遊戲主畫面", "確定要離開目前的對局嗎？遊戲進度會保留，回到主畫面後可再點「開始遊戲」續玩。", "離開遊戲", function () { exitGameToHome(); }, "繼續下棋");
+      } else {
+        exitGameToHome();
+      }
+    }
+
   function initEntryScreen() {
       var el = entryEl();
       if (!el) return;
@@ -1110,17 +1164,11 @@
         try { history.pushState({ gomokuScreen: "game" }, "", "/game"); } catch (e) { /* 靜態託管等環境不支援時忽略 */ }
         hideEntry();
         });
-      var homeBtn = document.getElementById("btn-game-home");
-      if (homeBtn) homeBtn.addEventListener("click", function () {
-        // 還沒落子：沒有任何進度，直接回主畫面不必確認
-        if (game.moves.length === 0) { exitGameToHome(); return; }
-        var confirmApi = window.GomokuConfirm;
-        if (confirmApi && typeof confirmApi.open === "function") {
-          confirmApi.open("回遊戲主畫面", "確定要離開目前的對局嗎？遊戲進度會保留，回到主畫面後可再點「開始遊戲」續玩。", "離開遊戲", function () { exitGameToHome(); }, "繼續下棋");
-        } else {
-          exitGameToHome();
-        }
-        });
+      if (els.gameMenuOpen) els.gameMenuOpen.addEventListener("click", function () {
+        if (els.gameMenu) els.gameMenu.classList.remove("hidden");
+      });
+      if (els.gameMenuClose) els.gameMenuClose.addEventListener("click", closeGameMenu);
+      if (els.gameMenuHome) els.gameMenuHome.addEventListener("click", requestExitGameToHome);
        }
 
   /* ==================== 線上對戰整合（GomokuOnline API）====================

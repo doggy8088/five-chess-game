@@ -212,15 +212,19 @@ test("app 棋盤縮放控制：更新縮放比例顯示", () => {
   assert.equal(value.textContent, "100%");
 });
 
-test("app 設定：記憶最後選擇的難度、縮放比例與執子陣營", () => {
+test("app 設定：記憶最後選擇的難度、縮放比例、執子陣營與棋盤鎖定", () => {
   var range = DOM.getElementById("zoom-range");
   setDiff("easy");
   range.value = "30";
   range.dispatch("input");
-  assert.deepEqual(JSON.parse(global.localStorage.getItem("gomoku-settings-v1")), { difficulty: "easy", zoom: 30, playerSide: "black" });
+  assert.deepEqual(JSON.parse(global.localStorage.getItem("gomoku-settings-v1")), {
+    difficulty: "easy", zoom: 30, playerSide: "black", boardViewLocked: false
+  });
 
   setSide("white");
-  assert.deepEqual(JSON.parse(global.localStorage.getItem("gomoku-settings-v1")), { difficulty: "easy", zoom: 30, playerSide: "white" });
+  assert.deepEqual(JSON.parse(global.localStorage.getItem("gomoku-settings-v1")), {
+    difficulty: "easy", zoom: 30, playerSide: "white", boardViewLocked: false
+  });
 
   setSide("black");
   setDiff("hard");
