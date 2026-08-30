@@ -211,12 +211,14 @@ test("鎖定棋盤：停用視角縮放但仍可解除鎖定", () => {
 
   lock.dispatch("click");
   assert.equal(lock.getAttribute("aria-pressed"), "true");
+  assert.match(lock.innerHTML, /解除棋盤視角鎖定/);
   assert.equal(range.disabled, true);
   gl.dispatch("wheel", { deltaX: 0, deltaY: -120, preventDefault() {} });
   assert.equal(value.textContent, "100%", "鎖定後滾輪不得改變棋盤縮放");
 
   lock.dispatch("click");
   assert.equal(lock.getAttribute("aria-pressed"), "false");
+  assert.match(lock.innerHTML, /鎖定棋盤視角/);
   assert.equal(range.disabled, false);
 });
 

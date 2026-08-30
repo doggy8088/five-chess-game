@@ -999,7 +999,11 @@
       for (var i = 0; i < buttons.length; i++) {
         if (!buttons[i]) continue;
         buttons[i].setAttribute("aria-pressed", String(boardViewLocked));
-        buttons[i].textContent = boardViewLocked ? "🔒 已鎖定" : "🔓 鎖定";
+        buttons[i].innerHTML = '<span class="board-lock-icon" aria-hidden="true">'
+          + (boardViewLocked ? "🔒" : "🔓")
+          + '</span><span class="board-lock-label">'
+          + (boardViewLocked ? "解除棋盤視角鎖定" : "鎖定棋盤視角")
+          + "</span>";
         buttons[i].title = boardViewLocked ? "解除棋盤視角鎖定" : "鎖定棋盤視角";
         buttons[i].setAttribute("aria-label", buttons[i].title);
       }
