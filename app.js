@@ -243,6 +243,7 @@
         // 攝影機 orbit
       var orbit = { radius: 15, theta: 0.6, phi: 0.92, last: { x: 0, y: 0 } };
       var reportedZoom = DEFAULT_ZOOM, onZoomCb = null, onViewChangeCb = null;
+      var viewTransition = null;
       function applyCam() {
         orbit.radius = Math.max(8, Math.min(60, orbit.radius));
         var sp = Math.sin(orbit.phi), cp = Math.cos(orbit.phi);
@@ -259,8 +260,23 @@
          }
       function setView(nextView) {
         var normalized = normalizeBoardView(nextView);
+        viewTransition = null;
         orbit.theta = normalized.theta;
         orbit.phi = normalized.phi;
+         }
+      function animateView(nextView) {
+        var normalized = normalizeBoardView(nextView);
+        var thetaDelta = Math.atan2(
+          Math.sin(normalized.theta - orbit.theta),
+          Math.cos(normalized.theta - orbit.theta));
+        viewTransition = {
+          startTheta: orbit.theta,
+          startPhi: orbit.phi,
+          targetTheta: orbit.theta + thetaDelta,
+          targetPhi: normalized.phi,
+          startedAt: clock,
+          duration: 0.48
+        };
          }
       function reportViewChange() {
         if (onViewChangeCb) onViewChangeCb({ theta: orbit.theta, phi: orbit.phi });
@@ -355,6 +371,10 @@
 
       canvas.addEventListener("pointerdown", function (e) {
         if (locked) return;
+        if (viewTransition) {
+          viewTransition = null;
+          reportViewChange();
+        }
         dragging = true; moved = false;
         downX = e.clientX; downY = e.clientY;
         orbit.last = { x: e.clientX, y: e.clientY };
@@ -402,6 +422,17 @@
       var clock = 0;
       function frame() {
         clock += 0.016;
+        if (viewTransition) {
+          var viewProgress = Math.min(1, (clock - viewTransition.startedAt) / viewTransition.duration);
+          var viewEase = viewProgress < 0.5
+            ? 4 * viewProgress * viewProgress * viewProgress
+            : 1 - Math.pow(-2 * viewProgress + 2, 3) / 2;
+          orbit.theta = viewTransition.startTheta
+            + (viewTransition.targetTheta - viewTransition.startTheta) * viewEase;
+          orbit.phi = viewTransition.startPhi
+            + (viewTransition.targetPhi - viewTransition.startPhi) * viewEase;
+          if (viewProgress >= 1) viewTransition = null;
+        }
         for (var i = animators.length - 1; i >= 0; i--) {
           var m = animators[i], ud = m.userData;
           if (ud.t0 === null) ud.t0 = clock;
@@ -436,6 +467,8 @@
         setZoom: setZoom,
         onZoom: function (cb) { onZoomCb = cb; },
         setView: setView,
+        animateView: animateView,
+        getView: function () { return { theta: orbit.theta, phi: orbit.phi }; },
         onViewChange: function (cb) { onViewChangeCb = cb; },
         reset: function () { clearGroup(stones); clearGroup(labels); clearGroup(marks); labels.visible = false; lastMarker.visible = false; animators.length = 0; },
         onPick: function (cb) { onPickCb = cb; },
@@ -585,6 +618,8 @@
         hideMoveNumbers: function () { st.showNumbers = false; draw(); },
         setZoom: function (percent) { st.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Number(percent) || DEFAULT_ZOOM)); draw(); },
         setView: function () {},
+        animateView: function () {},
+        getView: function () { return null; },
         onViewChange: function () {},
         reset: function () { st.stones = {}; st.last = null; st.win = []; st.showNumbers = false; draw(); },
         onPick: function (cb) { onPickCb = cb; },
@@ -1089,7 +1124,7 @@
       if (!view || !view._3d) return;
       boardViewPreset = (boardViewPreset + 1) % BOARD_VIEW_PRESETS.length;
       boardView = normalizeBoardView(BOARD_VIEW_PRESETS[boardViewPreset]);
-      view.setView(boardView);
+      view.animateView(boardView);
       saveSettings();
       if (els.toast) {
         els.toast.textContent = "棋盤視角：" + BOARD_VIEW_PRESETS[boardViewPreset].name;
@@ -1431,6 +1466,7 @@
       download: downloadResult,
       captureShare: makeShareCanvas,
       getShareFilename: getShareFilename,
+      getBoardView: function () { return view && view.getView ? view.getView() : null; },
       refresh: refresh,
       newGame: newGame,
       undo: function () {
