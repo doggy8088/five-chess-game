@@ -103,7 +103,7 @@ header.top{
 .dock-close:active{ transform:scale(.96); }
 .dock-close .ico{ width:16px; height:16px; display:inline-block; }
 
-/* 收起後重新開啟控制列的浮動鈕（右上角） */
+/* 收起後重新開啟控制列的按鈕 */
 .dock-open{
   position:absolute; z-index:6; top:16px; right:22px;
   width:44px; height:44px; padding:0; border-radius:50%;
@@ -256,7 +256,6 @@ button.btn.primary{ background:linear-gradient(180deg,var(--accent),#e85f40); bo
   #dock #btn-new, #dock #btn-undo{ flex:1 1 calc(50% - 5px); min-width:0; justify-content:center; }
   #dock #btn-mode{ flex:1 1 100%; justify-content:center; }
   .dock-close{ display:inline-flex; }
-  .dock-open{ top:64px; right:16px; }
 }
 
 /* =====================================================================
@@ -268,6 +267,7 @@ button.btn.primary{ background:linear-gradient(180deg,var(--accent),#e85f40); bo
 #local-game-hud{ position:fixed; z-index:8; top:16px; right:16px;
   display:flex; align-items:center; gap:8px; }
 body.entry-open #local-game-hud, body.mode-online #local-game-hud{ display:none; }
+#local-game-hud .dock-open{ position:static; flex:none; }
 .board-view-btn, .board-lock-btn{ position:static; padding:8px 14px; border-radius:999px; font-size:13px; }
 .board-lock-btn[aria-pressed="true"]{
   color:#fff; background:rgba(84,209,255,0.18); border-color:rgba(84,209,255,0.58);
