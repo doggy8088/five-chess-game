@@ -13,6 +13,8 @@
      var SETTINGS_KEY = "gomoku-settings-v1";
      var BOARD_VIEW_PRESETS = [
        { name: "右前方", theta: 0.6, phi: 0.92 },
+       { name: "正面（下方朝前）", theta: 0, phi: 0.92 },
+       { name: "正面（上方朝前）", theta: Math.PI, phi: 0.92 },
        { name: "左前方", theta: -0.6, phi: 0.92 },
        { name: "左後方", theta: -2.54, phi: 0.92 },
        { name: "右後方", theta: 2.54, phi: 0.92 },

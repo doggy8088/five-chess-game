@@ -227,18 +227,23 @@ test("鎖定棋盤：停用視角縮放但仍可解除鎖定", () => {
   assert.equal(range.disabled, false);
 });
 
-test("切換棋盤視角：循環預設方向並記憶角度", () => {
+test("切換棋盤視角：提供正面與上下翻轉方向並記憶角度", () => {
   var button = els.getElementById("btn-board-view-local");
   button.dispatch("click");
   var settings = JSON.parse(global.localStorage.getItem("gomoku-settings-v1"));
   assert.equal(settings.boardViewPreset, 1);
-  assert.deepEqual(settings.boardView, { theta: -0.6, phi: 0.92 });
+  assert.deepEqual(settings.boardView, { theta: 0, phi: 0.92 }, "第一個正面視角應水平置中");
+
+  button.dispatch("click");
+  settings = JSON.parse(global.localStorage.getItem("gomoku-settings-v1"));
+  assert.equal(settings.boardViewPreset, 2);
+  assert.deepEqual(settings.boardView, { theta: Math.PI, phi: 0.92 }, "第二個正面視角應上下翻轉");
 
   gl.dispatch("pointerdown", { clientX: 400, clientY: 300, buttons: 1 });
   gl.dispatch("pointermove", { clientX: 440, clientY: 340, buttons: 1 });
   gl.dispatch("pointerup", { clientX: 440, clientY: 340, buttons: 0 });
   settings = JSON.parse(global.localStorage.getItem("gomoku-settings-v1"));
-  assert.notDeepEqual(settings.boardView, { theta: -0.6, phi: 0.92 }, "手動調整後應記憶實際角度");
+  assert.notDeepEqual(settings.boardView, { theta: Math.PI, phi: 0.92 }, "手動調整後應記憶實際角度");
 });
 
 
